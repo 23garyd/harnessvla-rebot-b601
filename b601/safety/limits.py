@@ -1,9 +1,11 @@
 """Workspace and motion limits for the reBot B601-RS.
 
-THE RULE: every commanded motion passes through check_command() before it
-reaches the driver. Nothing bypasses this — not the planner, not a primitive,
-not the frozen ACT policy. A policy that emits an out-of-bounds action is a
-policy whose action gets rejected, not a policy that moves the arm there.
+THE RULE: every commanded Cartesian waypoint passes through check_command()
+before it reaches the driver. Bounded joint-space homing has its own
+precondition, velocity, timeout, and postcondition checks. Nothing bypasses
+the appropriate boundary — not the planner, not a primitive, not the frozen
+ACT policy. A policy that emits an out-of-bounds action is a policy whose
+action gets rejected, not a policy that moves the arm there.
 
 Everything here is pure: no hardware, no I/O, no global state. That is
 deliberate — the whole safety layer must be testable with the arm unpowered,
@@ -19,6 +21,7 @@ loads it.
 """
 import math
 import numbers
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 
@@ -86,12 +89,22 @@ def check_timeout(timeout_s, operation):
 
 def check_pose(xyz, workspace):
     """Reject a target pose outside the workspace box."""
+    try:
+        xyz = tuple(xyz)
+    except Exception as exc:
+        raise SafetyViolation("pose must be (x, y, z)", xyz) from exc
     if len(xyz) != 3:
         raise SafetyViolation("pose must be (x, y, z)", xyz)
-    if any(v != v for v in xyz):                      # NaN never compares true
+    if any(isinstance(v, bool) or not isinstance(v, numbers.Real)
+           for v in xyz):
+        raise SafetyViolation("pose must contain finite numbers", xyz)
+    if any(math.isnan(v) for v in xyz):
         raise SafetyViolation("pose contains NaN", xyz)
+    if any(not math.isfinite(v) for v in xyz):
+        raise SafetyViolation("pose must contain finite numbers", xyz)
     if not workspace.contains(xyz):
         raise SafetyViolation("pose outside workspace", xyz)
+    return xyz
 
 
 def check_step(current_xyz, target_xyz, limits):
@@ -110,13 +123,35 @@ def check_step(current_xyz, target_xyz, limits):
 
 
 def check_joint_velocity(velocities, limits):
+    try:
+        velocities = tuple(velocities)
+    except Exception as exc:
+        raise SafetyViolation(
+            "joint velocity state must be a numeric sequence",
+            velocities) from exc
     for i, v in enumerate(velocities):
-        if v != v:
+        if isinstance(v, bool) or not isinstance(v, numbers.Real):
+            raise SafetyViolation(
+                "joint velocity must be finite",
+                f"joint {i}: {v!r}")
+        if math.isnan(v):
             raise SafetyViolation("joint velocity is NaN", f"joint {i}")
+        if not math.isfinite(v):
+            raise SafetyViolation(
+                "joint velocity must be finite",
+                f"joint {i}: {v!r}")
         if abs(v) > limits.max_joint_velocity:
             raise SafetyViolation(
                 "joint velocity over limit",
                 f"joint {i}: |{v:.4f}| > {limits.max_joint_velocity:.4f} rad/s")
+    return velocities
+
+
+def check_joint_state(state, limits):
+    if not isinstance(state, Mapping) or "velocities" not in state:
+        raise SafetyViolation(
+            "joint state must provide velocities", state)
+    return check_joint_velocity(state["velocities"], limits)
 
 
 def check_gripper(force, limits):
@@ -136,7 +171,8 @@ def check_command(current_xyz, target_xyz, workspace, limits,
     Order matters: pose validity first (cheapest, catches NaN and gross
     errors), then step size, then per-joint velocity, then gripper.
     """
-    check_pose(target_xyz, workspace)
+    current_xyz = check_pose(current_xyz, workspace)
+    target_xyz = check_pose(target_xyz, workspace)
     distance = check_step(current_xyz, target_xyz, limits)
     if joint_velocities is not None:
         check_joint_velocity(joint_velocities, limits)

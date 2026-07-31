@@ -6,16 +6,17 @@ Two implementations sit behind `Driver`:
   - `B601Driver`   (b601/driver/b601.py) — the vendor SDK, added on Day 2
 
 `SafeDriver` wraps EITHER of them and is the only thing the rest of the
-codebase is allowed to hold. It routes every motion through
-b601.safety.limits.check_command and refuses to move after a fault until
-explicitly cleared. Primitives, planner and policy all talk to SafeDriver, so
-"did this motion get safety-checked?" has exactly one answer: yes.
+codebase is allowed to hold. It routes Cartesian moves through
+b601.safety.limits.check_command, enforces a separate bounded joint-space
+homing contract, and refuses to move after a fault until explicitly cleared.
+Primitives, planner and policy all talk to SafeDriver, so every motion reaches
+the appropriate safety boundary.
 """
 from abc import ABC, abstractmethod
 
 from b601.safety.limits import (SafetyViolation, check_cartesian_speed,
-                                check_command, check_joint_velocity,
-                                check_pose, check_timeout)
+                                check_command, check_joint_state, check_pose,
+                                check_timeout)
 
 
 class Driver(ABC):
@@ -82,7 +83,7 @@ class SafeDriver:
     def _actuate(self, operation, function, *args):
         try:
             return function(*args)
-        except Exception as exc:
+        except BaseException as exc:
             self._faulted = (
                 f"{operation} failed: {type(exc).__name__}: {exc}")
             raise
@@ -98,9 +99,11 @@ class SafeDriver:
         speed = self.limits.max_cartesian_speed if speed is None else speed
         try:
             speed = check_cartesian_speed(speed, self.limits)
+            joint_velocities = check_joint_state(
+                self._d.joint_state(), self.limits)
             distance = check_command(
                 self._d.eef_pose(), xyz, self.workspace, self.limits,
-                joint_velocities=self._d.joint_state().get("velocities"))
+                joint_velocities=joint_velocities)
         except SafetyViolation as exc:
             # Latch the fault: whatever produced this command is not trusted
             # to produce the next one either.
@@ -133,8 +136,7 @@ class SafeDriver:
         try:
             timeout_s = check_timeout(timeout_s, "safe_home")
             check_pose(self._d.eef_pose(), self.workspace)
-            check_joint_velocity(
-                self._d.joint_state().get("velocities"), self.limits)
+            check_joint_state(self._d.joint_state(), self.limits)
         except SafetyViolation as exc:
             self._faulted = exc.reason
             raise
@@ -143,8 +145,7 @@ class SafeDriver:
             self.limits.max_joint_velocity, timeout_s)
         try:
             check_pose(self._d.eef_pose(), self.workspace)
-            check_joint_velocity(
-                self._d.joint_state().get("velocities"), self.limits)
+            check_joint_state(self._d.joint_state(), self.limits)
         except SafetyViolation as exc:
             self._faulted = f"safe_home postcondition: {exc.reason}"
             raise
