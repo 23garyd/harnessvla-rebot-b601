@@ -8,6 +8,8 @@ artifacts/
 __pycache__/
 *.pyc
 .pytest_cache/
+.worktrees/
+.superpowers/
 
 !datasets/README.md
 !checkpoints/README.md
