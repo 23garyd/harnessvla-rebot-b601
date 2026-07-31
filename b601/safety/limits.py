@@ -73,6 +73,17 @@ def check_cartesian_speed(speed, limits):
     return float(speed)
 
 
+def check_timeout(timeout_s, operation):
+    if (isinstance(timeout_s, bool)
+            or not isinstance(timeout_s, numbers.Real)
+            or not math.isfinite(timeout_s)
+            or timeout_s <= 0.0):
+        raise SafetyViolation(
+            f"{operation} timeout out of range",
+            f"{timeout_s!r} must be finite and positive")
+    return float(timeout_s)
+
+
 def check_pose(xyz, workspace):
     """Reject a target pose outside the workspace box."""
     if len(xyz) != 3:

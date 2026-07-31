@@ -27,6 +27,7 @@ class MockDriver(Driver):
         self.fault_on_next_move = None
         self.fault_on_next_gripper = None
         self.fault_on_next_home = None
+        self.home_result = HOME
         self.grasp_succeeds = grasp_succeeds
         self.holding = False
 
@@ -68,13 +69,14 @@ class MockDriver(Driver):
         self.commands.append(("disable",))
         self.enabled = False
 
-    def safe_home(self):
+    def safe_home(self, max_joint_velocity, timeout_s):
         if self.fault_on_next_home is not None:
             fault, self.fault_on_next_home = self.fault_on_next_home, None
-            self.commands.append(("safe_home", "FAULT"))
+            self.commands.append(
+                ("safe_home", max_joint_velocity, timeout_s, "FAULT"))
             raise RuntimeError(f"mock hardware fault: {fault}")
-        self.commands.append(("safe_home",))
-        self._pose = HOME
+        self.commands.append(("safe_home", max_joint_velocity, timeout_s))
+        self._pose = tuple(self.home_result)
 
     # --- test helpers -----------------------------------------------------
     def set_velocities(self, velocities):
