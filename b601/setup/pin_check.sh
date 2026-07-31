@@ -11,7 +11,8 @@
 # INTERPRETER: probes run under the repository venv, never an ambient `python`.
 # On a normal shell, bare `python` can easily be a conda base or system install
 # carrying a different LeRobot, which would silently gate on the wrong
-# environment. Resolution order: $B601_PY, then .venv/bin/python, then fail.
+# environment. No interpreter override is accepted: use .venv/bin/python or
+# fail.
 #
 # NO SILENT FALLBACKS: a probe that cannot determine its value aborts. An
 # earlier version degraded to `|| echo UNKNOWN`, which recorded UNKNOWN and
@@ -29,8 +30,8 @@ case "${1:-}" in ""|--record) ;; *) usage ;; esac
 fail() { echo "FATAL: $*" >&2; exit 1; }
 
 # --- resolve the interpreter ---------------------------------------------
-PY="${B601_PY:-$REPO/.venv/bin/python}"
-[ -x "$PY" ] || fail "no repository interpreter at $PY — run 'bash b601/setup/setup.sh env' first, or set B601_PY"
+PY="$REPO/.venv/bin/python"
+[ -x "$PY" ] || fail "no repository interpreter at $PY — run 'bash b601/setup/setup.sh env' first"
 
 probe() {
     # $1 = probe name, $2 = optional path. Aborts on probe failure.
