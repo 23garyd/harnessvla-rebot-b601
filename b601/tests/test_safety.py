@@ -417,6 +417,67 @@ def test_safe_home_malformed_state_latches_and_blocks_later_motion(
         sd.move_to((0.32, 0.0, 0.35))
 
 
+@pytest.mark.parametrize("boundary", ["pre", "post"])
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        {"positions": [], "velocities": []},
+        {"positions": [0.0] * 6, "velocities": [0.0] * 5},
+        {"positions": [0.0] * 6, "velocities": [0.0] * 7},
+    ],
+    ids=["empty", "short-velocities", "long-velocities"],
+)
+def test_safe_home_rejects_incomplete_joint_state_at_each_boundary(
+        boundary, invalid_state):
+    valid_state = {
+        "positions": [0.0] * 6,
+        "velocities": [0.0] * 6,
+    }
+    joint_states = (
+        [invalid_state, valid_state] if boundary == "pre"
+        else [valid_state, invalid_state]
+    )
+    mock = ScriptedStateMock(
+        [(0.30, 0.0, 0.35)] * 2, joint_states)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation, match="joint state"):
+        sd.safe_home(timeout_s=12.0)
+
+    assert (mock.last("safe_home") is not None) is (boundary == "post")
+    assert sd.faulted is not None
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        {"velocities": [0.0] * 6},
+        {"positions": "000000", "velocities": [0.0] * 6},
+    ],
+    ids=["missing-positions", "string-positions"],
+)
+def test_safe_home_rejects_missing_or_malformed_positions(invalid_state):
+    valid_state = {
+        "positions": [0.0] * 6,
+        "velocities": [0.0] * 6,
+    }
+    mock = ScriptedStateMock(
+        [(0.30, 0.0, 0.35)] * 2, [invalid_state, valid_state])
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation, match="joint state"):
+        sd.safe_home(timeout_s=12.0)
+
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
 @pytest.mark.parametrize(
     ("poses", "joint_states", "target"),
     [

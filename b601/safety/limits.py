@@ -21,7 +21,7 @@ loads it.
 """
 import math
 import numbers
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 
@@ -148,10 +148,26 @@ def check_joint_velocity(velocities, limits):
 
 
 def check_joint_state(state, limits):
-    if not isinstance(state, Mapping) or "velocities" not in state:
+    if (not isinstance(state, Mapping)
+            or "positions" not in state
+            or "velocities" not in state):
         raise SafetyViolation(
-            "joint state must provide velocities", state)
-    return check_joint_velocity(state["velocities"], limits)
+            "joint state must provide positions and velocities", state)
+    positions = state["positions"]
+    velocities = state["velocities"]
+    if (isinstance(positions, (str, bytes))
+            or not isinstance(positions, Sequence)
+            or isinstance(velocities, (str, bytes))
+            or not isinstance(velocities, Sequence)):
+        raise SafetyViolation(
+            "joint state positions and velocities must be sequences", state)
+    if not positions or not velocities:
+        raise SafetyViolation("joint state must not be empty", state)
+    if len(positions) != len(velocities):
+        raise SafetyViolation(
+            "joint state positions and velocities must have equal length",
+            f"{len(positions)} positions, {len(velocities)} velocities")
+    return check_joint_velocity(velocities, limits)
 
 
 def check_gripper(force, limits):
