@@ -11,6 +11,11 @@ from b601.safety.limits import (MotionLimits, SafetyViolation, Workspace,
                                 check_command, check_gripper,
                                 check_joint_velocity, check_pose, check_step)
 
+# SYNTHETIC fixture, deliberately not loaded from b601/setup/limits.yaml.
+# These tests exercise the guard LOGIC, so they must not change meaning when
+# Day-2 measurement replaces the shipped envelope — a test whose in-bounds
+# pose silently becomes out-of-bounds is a test that stopped asserting what it
+# says. The shipped file is loaded and validated in test_limits_config.py.
 WS = Workspace(x_min=0.15, x_max=0.55, y_min=-0.30, y_max=0.30,
                z_min=0.02, z_max=0.50)
 LIM = MotionLimits(max_joint_velocity=1.0, max_cartesian_speed=0.25,

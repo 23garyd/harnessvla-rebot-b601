@@ -11,7 +11,8 @@ B601. The learned primitive here is a B601-specific ACT policy trained from
 teleoperated demonstrations.
 
 ## Where things stand
-Day 0 scaffold. 28 safety tests green, no hardware powered, no data collected.
+Day 0 scaffold. 94 tests green (`bash b601/setup/setup.sh verify`), no
+hardware powered, no data collected.
 
 ## Read first
 1. `docs/sim_findings_that_transfer.md` — measured results from the sim track

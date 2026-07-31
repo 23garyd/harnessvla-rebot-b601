@@ -2,8 +2,14 @@
 harness).
 
 Rules frozen at the Day-5 protocol freeze:
-- success is the ledger's predicate-derived 1/0; infra_failure rows are
-  excluded (they are documented attempts, not scored outcomes);
+- success is the ledger's predicate-derived 1/0; infra_failure and
+  safety_abort rows are excluded (they are documented attempts, not scored
+  outcomes). A safety abort scored as an ordinary task failure would count a
+  safety event against the harness arm and disappear into its success rate —
+  the sim track's finding #5, where three planner timeouts folded into a rate
+  turned "memory saves deliberation time" into "memory enables grounding".
+  They are counted and named instead, because the Day-18 gate is "zero safety
+  events" and dropping the seed's pair is the honest consequence;
 - aggregation is over COMPLETE (task, seed) pairs only — a seed missing
   either condition is reported under `unpaired`, never averaged over;
 - intervals are Wilson score intervals (z=1.96), chosen over normal
@@ -32,8 +38,11 @@ def paired_table(rows):
     """Build the paired comparison from ledger rows (list of dicts with
     condition/task/seed/success/validity). Returns cells, aggregate,
     paired flip counts, and the unpaired outcomes that were excluded."""
-    scored = {}
+    scored, safety_aborts = {}, []
     for r in rows:
+        if r["validity"] == "safety_abort":
+            safety_aborts.append((r["task"], r["seed"], r["condition"]))
+            continue
         if r["validity"] == "infra_failure":
             continue
         key = (r["task"], r["seed"], r["condition"])
@@ -53,7 +62,11 @@ def paired_table(rows):
 
     def summarize(outcomes):
         k, n = sum(outcomes), len(outcomes)
-        return {"k": k, "n": n, "wilson": wilson_interval(k, n)}
+        # n == 0 is reachable whenever exclusions remove every pair (all
+        # infra_failure, or a safety abort on one arm of every seed). Report
+        # the empty cell; crashing the analysis is a worse answer than 0/0.
+        return {"k": k, "n": n,
+                "wilson": wilson_interval(k, n) if n else None}
 
     cells = {}
     for (task, _seed), (d, h) in pairs.items():
@@ -71,10 +84,12 @@ def paired_table(rows):
     aggregate = {cond: summarize([p[i] for p in pairs.values()])
                  for i, cond in enumerate(("direct", "harness"))}
     return {"cells": cells, "aggregate": aggregate, "flips": flips,
-            "unpaired": unpaired}
+            "unpaired": unpaired, "safety_aborts": sorted(safety_aborts)}
 
 
 def _fmt(s):
+    if s["wilson"] is None:
+        return f"{s['k']}/{s['n']} [no scored pairs]"
     lo, hi = s["wilson"]
     return f"{s['k']}/{s['n']} [{lo:.2f}, {hi:.2f}]"
 
@@ -95,6 +110,11 @@ def render_markdown(table):
     lines.append(f"Paired flips: {f['rescued']} rescued (direct fail, "
                  f"harness pass), {f['regressed']} regressed, "
                  f"{f['both_pass']} both-pass, {f['both_fail']} both-fail.")
+    aborts = table["safety_aborts"]
+    lines.append("")
+    lines.append(f"{len(aborts)} safety abort{'' if len(aborts) == 1 else 's'} "
+                 f"(excluded from scoring, reported here because the gate is "
+                 f"zero){': ' + str(aborts) if aborts else '.'}")
     if table["unpaired"]:
         lines.append("")
         lines.append(f"Excluded as unpaired (never averaged over): "

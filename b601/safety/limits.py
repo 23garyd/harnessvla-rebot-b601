@@ -11,7 +11,11 @@ which is when you actually want to be testing it.
 
 Limits are DATA (b601/setup/limits.yaml), not constants baked into code, so a
 limit change is a reviewable diff with an experiment-registry entry rather
-than an edit buried in a function.
+than an edit buried in a function. `b601.safety.config.load_limits()` is what
+reads that file and the only sanctioned way to build the envelope in
+production code — this module stays pure so the guards can be tested without
+a filesystem, but "the limits live in YAML" is only true because something
+loads it.
 """
 from dataclasses import dataclass
 

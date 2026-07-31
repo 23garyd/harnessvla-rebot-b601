@@ -11,13 +11,18 @@ import json
 import sys
 from pathlib import Path
 
-from track.analysis.schemas import validate_result_row, validate_run_meta
+from b601.analysis.schemas import validate_result_row, validate_run_meta
 
+# The physical pins are columns, not a footnote: every Day-18 number must be
+# groupable by the camera configuration and calibration that produced it. A
+# ledger that cannot express "these episodes ran under a different mount" is
+# the sim track's stale-reference regression with no way to find it.
 LEDGER_COLUMNS = [
-    "exp_version", "condition", "suite", "task", "seed", "run_id",
+    "exp_version", "condition", "task", "seed", "run_id",
     "success", "validity", "terminal_reason",
     "steps", "turns", "vla_act_calls", "analytic_calls", "wall_seconds",
-    "planner_model", "rpent_commit", "checkpoint_sha256", "run_dir",
+    "planner_model", "repo_commit", "checkpoint_sha256",
+    "lerobot_version", "camera_serials", "calibration_sha256", "run_dir",
 ]
 
 
@@ -42,7 +47,6 @@ def load_row(run_dir):
     return {
         "exp_version": meta["exp_version"],
         "condition": meta["condition"],
-        "suite": meta["suite"],
         "task": meta["task"],
         "seed": meta["seed"],
         "run_id": run_dir.name,
@@ -55,8 +59,11 @@ def load_row(run_dir):
         "analytic_calls": result["counts"]["analytic_calls"],
         "wall_seconds": result["wall_seconds"],
         "planner_model": meta["planner_model"],
-        "rpent_commit": meta["rpent_commit"],
+        "repo_commit": meta["repo_commit"],
         "checkpoint_sha256": meta["checkpoint_sha256"],
+        "lerobot_version": meta["pins"]["lerobot_version"],
+        "camera_serials": meta["pins"]["camera_serials"],
+        "calibration_sha256": meta["pins"]["calibration_sha256"],
         "run_dir": str(run_dir),
     }
 
@@ -76,7 +83,7 @@ def build_ledger(runs_root):
             skipped_seed0 += 1
             continue
         rows.append(row)
-    rows.sort(key=lambda r: (r["exp_version"], r["condition"], r["suite"],
+    rows.sort(key=lambda r: (r["exp_version"], r["condition"],
                              r["task"], r["seed"], r["run_id"]))
     return rows, skipped_seed0, incomplete
 
@@ -99,10 +106,15 @@ def main(argv=None):
     rows, skipped_seed0, incomplete = build_ledger(args.runs_root)
     write_csv(rows, args.out)
     infra = sum(1 for r in rows if r["validity"] == "infra_failure")
-    print(f"ledger: {len(rows)} rows ({len(rows) - infra} scored, "
+    # Safety aborts are printed on their own line, always, including zero:
+    # the Day-18 gate is "zero safety events" and a number you have to infer
+    # from an absent line is a number nobody checked.
+    aborts = sum(1 for r in rows if r["validity"] == "safety_abort")
+    print(f"ledger: {len(rows)} rows ({len(rows) - infra - aborts} scored, "
           f"{infra} infra_failure) -> {args.out} "
           f"(excluded: {skipped_seed0} seed-0 bootstrap, "
           f"{incomplete} incomplete)")
+    print(f"safety aborts: {aborts}")
     return 0
 
 

@@ -10,6 +10,8 @@ as each step is first performed, describes the one you actually built.
 ## To fill in as each capability lands
 - [ ] Power-on and e-stop check (Day 2)
 - [ ] Enable, safe-home, verify joint state (Day 2)
+- [ ] Replace the provisional limits with measured ones, then validate the
+      envelope: `PYTHONPATH= .venv/bin/python -m b601.safety.config` (Day 2)
 - [ ] Camera start, serial verification, calibration check (Day 3)
 - [ ] `pin_check.sh` — expected output and what a failure means (Day 3)
 - [ ] Workspace reset and object placement (Day 6)

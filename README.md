@@ -20,7 +20,7 @@ Day-2 measurement.
 
 | path | what |
 |---|---|
-| `b601/safety/` | workspace + motion limits. **Every motion routes through here** |
+| `b601/safety/` | workspace + motion limits (`config.py` loads and validates `limits.yaml`). **Every motion routes through here** |
 | `b601/driver/` | driver interface, `SafeDriver` chokepoint, mock (no hardware) |
 | `b601/cameras/` | capture config, calibration, sync checking |
 | `b601/primitives/` | analytic observe / stage / transport / release / verify |
@@ -46,7 +46,19 @@ robot is safety code you will stop exercising.
 ## Commands
 
 ```bash
+bash b601/setup/setup.sh env          # once per machine: .venv + pinned deps
+
 # every session
 bash b601/setup/pin_check.sh          # gates software AND physical pins
-PYTHONPATH= python -m pytest b601/tests/ -q
+bash b601/setup/setup.sh verify       # the unpowered suite, in the repo venv
+```
+
+Both commands run under the repository interpreter. Do not invoke them with an
+ambient `python`: on a machine with another environment on `PATH` that checks
+a different install than the one `setup.sh env` created, which is how a pin
+gate ends up verifying nothing. `B601_PY` overrides the interpreter if needed.
+
+```bash
+# after editing the safety envelope (Day 2), before any powered motion
+PYTHONPATH= .venv/bin/python -m b601.safety.config
 ```
