@@ -1,0 +1,29 @@
+# B601 track dependencies.
+#
+# UNVERIFIED ON TARGET. This repo was scaffolded on a machine with an A6000;
+# the B601 track runs on the robot PC (RTX 5090). Versions below are the
+# starting point for Day-2 bring-up, not a validated lock. Once the stack runs
+# on the robot PC, freeze exact versions here and record them via
+# `pin_check.sh --record` — after which a change is a registry event.
+#
+# RTX 50-series note: sm_120 needs a recent CUDA build of torch. Installing
+# plain `torch` will likely give you a wheel that cannot run on the 5090 —
+# this was already a known trap in the sim track (its pins target sm_86).
+
+# --- core (needed for the unpowered test suite) ---
+pytest>=8.0
+pyyaml>=6.0
+
+# --- data + training (Week 2-3) ---
+# lerobot pinned at bring-up; the sim track learned that a lerobot pin living
+# in a uv-only [tool.uv.sources] table is invisible to pip.
+# lerobot==<pin at Day 2>
+# torch==<CUDA build matching sm_120>
+
+# --- perception (Week 1) ---
+# pyrealsense2>=2.55        # D405 wrist + D435 fixed
+# opencv-python>=4.9
+
+# --- robot I/O (Day 2) ---
+# python-can>=4.3           # CAN adapter
+# <B601 vendor SDK>         # source and version to be recorded on Day 2
