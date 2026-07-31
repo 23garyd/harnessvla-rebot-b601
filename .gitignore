@@ -1,0 +1,14 @@
+# Irreplaceable but too large for git: teleop episodes, trained policies, eval runs.
+# Their HASHES are committed (b601/registry/), the bytes are backed up off-machine.
+datasets/
+checkpoints/
+artifacts/
+.venv/
+.venv-dev/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+!datasets/README.md
+!checkpoints/README.md
+!artifacts/README.md

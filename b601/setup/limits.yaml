@@ -1,0 +1,20 @@
+# Safety envelope for the reBot B601-RS. DATA, not code: a change here is a
+# reviewable diff and needs an experiment-registry entry, because it changes
+# what the robot is permitted to do.
+#
+# PROVISIONAL — every number below is a placeholder pending the Day-2 bring-up
+# measurement. Do not run powered autonomous motion against these until Day 2
+# has replaced them with measured values and the mentor has signed off (Day-1
+# acceptance gate).
+workspace:            # robot base frame, metres
+  x_min: 0.15
+  x_max: 0.55
+  y_min: -0.30
+  y_max: 0.30
+  z_min: 0.02         # table surface + clearance
+  z_max: 0.50
+motion:
+  max_joint_velocity: 1.0     # rad/s per joint
+  max_cartesian_speed: 0.25   # m/s EEF
+  max_step_distance: 0.15     # m per commanded waypoint
+  max_gripper_force: 1.0      # normalised
