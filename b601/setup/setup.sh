@@ -5,11 +5,13 @@
 # treat first run as part of the plan's Day-2 bring-up, and fix this script
 # rather than working around it.
 #
-# Stages are independent and idempotent:
-#   env       create .venv and install pinned deps
-#   verify    run the unpowered test suite (no arm, no cameras needed)
-#   hardware  probe for the arm, CAN adapter and cameras — REPORTS ONLY,
+# Stages are idempotent. `env` is a PREREQUISITE of the other two, because both
+# run under the repository interpreter rather than an ambient python:
+#   env       create .venv and install pinned deps           (run this first)
+#   verify    run the unpowered test suite                   (requires env)
+#   hardware  probe GPU/CAN/RealSense — REPORTS ONLY,        (requires env)
 #             never enables or moves anything
+# A missing venv produces an actionable error, not a bare exit 127.
 #
 # Deliberately absent: any stage that powers or moves the robot. Motion
 # happens through the tested primitives, never through a setup script.
@@ -33,7 +35,16 @@ do_env() {
     "$VENV/bin/python" -c "import sys; print('python', sys.version.split()[0])"
 }
 
+require_env() {
+    [ -x "$VENV/bin/python" ] || {
+        echo "FATAL: no interpreter at $VENV/bin/python" >&2
+        echo "       run 'bash b601/setup/setup.sh env' first" >&2
+        exit 1
+    }
+}
+
 do_verify() {
+    require_env
     echo "=== verify (unpowered) ==="
     # PYTHONPATH= guards against a polluted parent environment (ROS on some
     # boxes injects packages that break pytest collection).
@@ -41,6 +52,7 @@ do_verify() {
 }
 
 do_hardware() {
+    require_env
     echo "=== hardware probe (report only, nothing is enabled) ==="
     echo "--- GPU ---"
     nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null \
