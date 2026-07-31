@@ -88,6 +88,14 @@ class SafeDriver:
                 f"{operation} failed: {type(exc).__name__}: {exc}")
             raise
 
+    def _read_state(self, operation, function):
+        try:
+            return function()
+        except BaseException as exc:
+            self._faulted = (
+                f"{operation} failed: {type(exc).__name__}: {exc}")
+            raise
+
     def joint_state(self):
         return self._d.joint_state()
 
@@ -100,9 +108,11 @@ class SafeDriver:
         try:
             speed = check_cartesian_speed(speed, self.limits)
             joint_velocities = check_joint_state(
-                self._d.joint_state(), self.limits)
+                self._read_state("move_to joint_state", self._d.joint_state),
+                self.limits)
             distance = check_command(
-                self._d.eef_pose(), xyz, self.workspace, self.limits,
+                self._read_state("move_to eef_pose", self._d.eef_pose),
+                xyz, self.workspace, self.limits,
                 joint_velocities=joint_velocities)
         except SafetyViolation as exc:
             # Latch the fault: whatever produced this command is not trusted
@@ -124,7 +134,8 @@ class SafeDriver:
         self._actuate("set_gripper", self._d.set_gripper, force)
 
     def enable(self):
-        self._d.enable()
+        self._require_ok()
+        self._actuate("enable", self._d.enable)
 
     def disable(self):
         """Always permitted, even when faulted — disabling must never be
@@ -135,8 +146,14 @@ class SafeDriver:
         self._require_ok()
         try:
             timeout_s = check_timeout(timeout_s, "safe_home")
-            check_pose(self._d.eef_pose(), self.workspace)
-            check_joint_state(self._d.joint_state(), self.limits)
+            check_pose(
+                self._read_state(
+                    "safe_home pre eef_pose", self._d.eef_pose),
+                self.workspace)
+            check_joint_state(
+                self._read_state(
+                    "safe_home pre joint_state", self._d.joint_state),
+                self.limits)
         except SafetyViolation as exc:
             self._faulted = exc.reason
             raise
@@ -144,8 +161,14 @@ class SafeDriver:
             "safe_home", self._d.safe_home,
             self.limits.max_joint_velocity, timeout_s)
         try:
-            check_pose(self._d.eef_pose(), self.workspace)
-            check_joint_state(self._d.joint_state(), self.limits)
+            check_pose(
+                self._read_state(
+                    "safe_home post eef_pose", self._d.eef_pose),
+                self.workspace)
+            check_joint_state(
+                self._read_state(
+                    "safe_home post joint_state", self._d.joint_state),
+                self.limits)
         except SafetyViolation as exc:
             self._faulted = f"safe_home postcondition: {exc.reason}"
             raise

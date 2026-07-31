@@ -167,6 +167,17 @@ def check_joint_state(state, limits):
         raise SafetyViolation(
             "joint state positions and velocities must have equal length",
             f"{len(positions)} positions, {len(velocities)} velocities")
+    for i, position in enumerate(positions):
+        if isinstance(position, bool) or not isinstance(position, numbers.Real):
+            raise SafetyViolation(
+                "joint position must be finite",
+                f"joint {i}: {position!r}")
+        if math.isnan(position):
+            raise SafetyViolation("joint position is NaN", f"joint {i}")
+        if not math.isfinite(position):
+            raise SafetyViolation(
+                "joint position must be finite",
+                f"joint {i}: {position!r}")
     return check_joint_velocity(velocities, limits)
 
 
