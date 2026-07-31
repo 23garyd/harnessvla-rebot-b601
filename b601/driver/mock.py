@@ -24,9 +24,24 @@ class MockDriver(Driver):
         self._gripper = 0.0
         self.enabled = False
         self.commands = []          # full audit trail of what was sent
+        # Injectable hardware faults, one per motion-bearing call. A string
+        # becomes a RuntimeError; an exception instance is raised as given, so
+        # a test can inject a BaseException (an operator Ctrl-C mid-motion) as
+        # well as an ordinary driver failure.
         self.fault_on_next_move = None
+        self.fault_on_next_gripper = None
+        self.fault_on_next_home = None
         self.grasp_succeeds = grasp_succeeds
         self.holding = False
+
+    def _maybe_fault(self, attr):
+        fault = getattr(self, attr)
+        if fault is None:
+            return
+        setattr(self, attr, None)
+        if isinstance(fault, BaseException):
+            raise fault
+        raise RuntimeError(f"mock hardware fault: {fault}")
 
     # --- Driver interface -------------------------------------------------
     def joint_state(self):
@@ -38,13 +53,15 @@ class MockDriver(Driver):
 
     def move_to(self, xyz, speed):
         if self.fault_on_next_move is not None:
-            fault, self.fault_on_next_move = self.fault_on_next_move, None
             self.commands.append(("move_to", tuple(xyz), speed, "FAULT"))
-            raise RuntimeError(f"mock hardware fault: {fault}")
+            self._maybe_fault("fault_on_next_move")
         self.commands.append(("move_to", tuple(xyz), speed))
         self._pose = tuple(xyz)
 
     def set_gripper(self, force):
+        if self.fault_on_next_gripper is not None:
+            self.commands.append(("set_gripper", force, "FAULT"))
+            self._maybe_fault("fault_on_next_gripper")
         self.commands.append(("set_gripper", force))
         self._gripper = force
         # Closing on a graspable object: holding iff the scenario says so.
@@ -62,6 +79,9 @@ class MockDriver(Driver):
         self.enabled = False
 
     def safe_home(self):
+        if self.fault_on_next_home is not None:
+            self.commands.append(("safe_home", "FAULT"))
+            self._maybe_fault("fault_on_next_home")
         self.commands.append(("safe_home",))
         self._pose = HOME
 

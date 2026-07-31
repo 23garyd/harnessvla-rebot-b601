@@ -11,8 +11,11 @@ B601. The learned primitive here is a B601-specific ACT policy trained from
 teleoperated demonstrations.
 
 ## Where things stand
-Day 0 scaffold. 94 tests green (`bash b601/setup/setup.sh verify`), no
+Day 0 scaffold. 115 tests green (`bash b601/setup/setup.sh verify`), no
 hardware powered, no data collected.
+
+**Before powered motion:** `safe_home()` has no bounded contract yet (risk log,
+open). It is fault-latched and counted but not path-checked. Day-2 work.
 
 ## Read first
 1. `docs/sim_findings_that_transfer.md` — measured results from the sim track

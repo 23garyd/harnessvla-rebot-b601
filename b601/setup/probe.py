@@ -44,6 +44,25 @@ def lerobot_version():
     return version
 
 
+def python_executable(path=None):
+    """Path of the interpreter running this probe.
+
+    The interpreter is a pin in its own right: every other value here is
+    "as seen by THIS python", so recording under one environment and verifying
+    under another compares two installations and calls the result agreement.
+    B601_PY makes that override legitimate and easy, which is exactly why it
+    has to be gated rather than merely noted.
+
+    NOT resolved through symlinks: a venv's bin/python points at the system
+    interpreter, so resolving would report the same path for two different
+    environments — the opposite of what this pin is for.
+    """
+    if not sys.executable:
+        raise ProbeError(
+            "this interpreter reports no sys.executable; it cannot be pinned")
+    return sys.executable
+
+
 def camera_serials(path=None):
     """Sorted, comma-joined camera serials from the camera manifest.
 
@@ -78,6 +97,7 @@ def calibration_sha256(path=None):
 
 
 _PROBES = {
+    "python-executable": python_executable,
     "lerobot-version": lambda a: lerobot_version(),
     "camera-serials": camera_serials,
     "calibration-sha256": calibration_sha256,

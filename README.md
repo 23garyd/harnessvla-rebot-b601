@@ -37,7 +37,16 @@ Day-2 measurement.
 **1. Nothing bypasses the safety chokepoint.** Primitives, planner and policy
 all hold a `SafeDriver`, never a raw driver. A policy that emits an
 out-of-bounds action gets that action rejected and latches a fault; it does
-not get a clamped version of a wild command.
+not get a clamped version of a wild command. Anything that fails mid-motion —
+driver exception, operator interrupt — latches too: after uncertain actuation
+the arm is not where the last command said it was, and every later step check
+would be measured from a stale pose.
+
+What the chokepoint does **not** cover: `safe_home()` is fault-latched and
+counted but not path-checked, because homing is a joint-space trajectory this
+layer never sees. Its bounded contract is a Day-2 deliverable and it must not
+run under power before then. Guards state their gaps here rather than leaving
+them to be discovered.
 
 **2. The test suite never needs hardware.** If a test would need the arm,
 extend `MockDriver` instead. Safety code you can only exercise by powering the

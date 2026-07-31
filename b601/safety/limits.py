@@ -1,9 +1,11 @@
 """Workspace and motion limits for the reBot B601-RS.
 
-THE RULE: every commanded motion passes through check_command() before it
-reaches the driver. Nothing bypasses this — not the planner, not a primitive,
-not the frozen ACT policy. A policy that emits an out-of-bounds action is a
-policy whose action gets rejected, not a policy that moves the arm there.
+THE RULE: every commanded Cartesian motion passes through check_command()
+before it reaches the driver. Nothing bypasses this — not the planner, not a
+primitive, not the frozen ACT policy. A policy that emits an out-of-bounds
+action is a policy whose action gets rejected, not a policy that moves the arm
+there. The one motion these functions cannot express is homing, a joint-space
+trajectory; SafeDriver.safe_home documents what guards it instead.
 
 Everything here is pure: no hardware, no I/O, no global state. That is
 deliberate — the whole safety layer must be testable with the arm unpowered,

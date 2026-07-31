@@ -178,6 +178,117 @@ def test_hardware_fault_propagates_and_is_recorded():
     assert mock.last()[-1] == "FAULT"
 
 
+# --- fail closed after uncertain actuation --------------------------------
+#
+# A driver exception means the motion did not complete as commanded, so the
+# arm is NOT where the last command said it was. check_step measures the next
+# waypoint from eef_pose(); if that reading is stale the following command is
+# checked against a fiction. Latching is not only the documented contract, it
+# is what keeps the remaining guards meaningful.
+
+def test_hardware_fault_latches_the_driver():
+    mock, sd = safe()
+    mock.fault_on_next_move = "joint 3 overcurrent"
+    with pytest.raises(RuntimeError):
+        sd.move_to((0.32, 0.0, 0.35))
+    assert sd.faulted is not None, "hardware fault did not latch"
+
+
+def test_no_motion_is_accepted_after_a_hardware_fault():
+    """The defect: an injected overcurrent was followed by an accepted move."""
+    mock, sd = safe()
+    mock.fault_on_next_move = "joint 3 overcurrent"
+    with pytest.raises(RuntimeError):
+        sd.move_to((0.32, 0.0, 0.35))
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.33, 0.0, 0.35))          # a perfectly legal move
+    assert mock.last("move_to")[-1] == "FAULT", "a move ran after the fault"
+
+
+def test_hardware_fault_names_itself_in_the_latched_reason():
+    """A safety rejection and a hardware failure need different recoveries;
+    the registry entry has to be able to tell them apart."""
+    mock, sd = safe()
+    mock.fault_on_next_move = "joint 3 overcurrent"
+    with pytest.raises(RuntimeError):
+        sd.move_to((0.32, 0.0, 0.35))
+    assert "hardware" in sd.clear_fault()
+
+
+def test_gripper_hardware_fault_latches():
+    mock, sd = safe()
+    mock.fault_on_next_gripper = "gripper stalled"
+    with pytest.raises(RuntimeError):
+        sd.set_gripper(0.8)
+    assert sd.faulted is not None
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
+def test_safe_home_hardware_fault_latches():
+    mock, sd = safe()
+    mock.fault_on_next_home = "CAN timeout"
+    with pytest.raises(RuntimeError):
+        sd.safe_home()
+    assert sd.faulted is not None
+
+
+def test_interrupt_during_motion_latches():
+    """An operator Ctrl-C mid-motion leaves the arm in exactly the state a
+    driver exception does: somewhere between two poses."""
+    mock, sd = safe()
+    mock.fault_on_next_move = KeyboardInterrupt("operator stop")
+    with pytest.raises(KeyboardInterrupt):
+        sd.move_to((0.32, 0.0, 0.35))
+    assert sd.faulted is not None
+
+
+def test_disable_still_works_after_a_hardware_fault():
+    mock, sd = safe()
+    mock.fault_on_next_move = "joint 3 overcurrent"
+    with pytest.raises(RuntimeError):
+        sd.move_to((0.32, 0.0, 0.35))
+    sd.disable()
+    assert mock.enabled is False
+
+
+# --- speed must be a positive finite number -------------------------------
+
+@pytest.mark.parametrize("speed", [-5.0, -0.001, 0.0, float("nan"),
+                                   float("inf"), float("-inf")])
+def test_invalid_speed_never_reaches_the_driver(speed):
+    """Only the upper bound was checked. NaN fails every comparison, so
+    `speed > max` was False and it went straight through; negatives too."""
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation, match="speed"):
+        sd.move_to((0.32, 0.0, 0.35), speed=speed)
+    assert mock.last("move_to") is None
+
+
+def test_invalid_speed_latches_like_any_other_rejection():
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation):
+        sd.move_to((0.32, 0.0, 0.35), speed=float("nan"))
+    assert sd.faulted is not None
+
+
+def test_non_numeric_speed_is_rejected():
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation, match="speed"):
+        sd.move_to((0.32, 0.0, 0.35), speed="fast")
+    assert mock.last("move_to") is None
+
+
+# --- safe_home accounting -------------------------------------------------
+
+def test_safe_home_counts_as_a_motion():
+    """It moves the arm. A motion counter that misses it under-reports every
+    Day-2 repeatability figure that uses it."""
+    _, sd = safe()
+    sd.safe_home()
+    assert sd.motions == 1
+
+
 def test_mock_models_empty_grasp_for_the_day16_verifier():
     """Day-16 needs induced empty grasps; this is how they get induced with
     no hardware and no risk."""

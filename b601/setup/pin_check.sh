@@ -5,13 +5,20 @@
 # PHYSICAL configuration is experiment state too — the plan is explicit that a
 # changed camera invalidates affected episodes and evaluations.
 #
-#   software  — LeRobot version (as seen by THIS repo's interpreter)
+#   software  — the interpreter itself, then LeRobot version as seen by it
 #   physical  — camera serials, calibration file hash
 #
-# INTERPRETER: probes run under the repository venv, never an ambient `python`.
-# On a normal shell, bare `python` can easily be a conda base or system install
-# carrying a different LeRobot, which would silently gate on the wrong
-# environment. Resolution order: $B601_PY, then .venv/bin/python, then fail.
+# INTERPRETER: probes run under the repository venv by default, never an
+# ambient `python` — on a normal shell bare `python` can easily be a conda base
+# or system install carrying a different LeRobot. Resolution order: $B601_PY,
+# then .venv/bin/python, then fail.
+#
+# $B601_PY is a legitimate override (the robot PC may run a deliberately
+# managed environment), so the interpreter is PINNED rather than assumed:
+# recorded as PYTHON_EXECUTABLE and compared on every verify. Recording under
+# one environment and verifying under another compares two installations and
+# reports agreement. It used to be written as a comment, which pin() cannot
+# read and verify never checked — recorded, but not gated.
 #
 # NO SILENT FALLBACKS: a probe that cannot determine its value aborts. An
 # earlier version degraded to `|| echo UNKNOWN`, which recorded UNKNOWN and
@@ -46,6 +53,7 @@ pin() { grep -E "^$1=" "$PINS" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
 # --- record ---------------------------------------------------------------
 if [ "${1:-}" = "--record" ]; then
+    pyexe="$(probe python-executable)"
     lerobot="$(probe lerobot-version)"
     cams="$(probe camera-serials "$CAMERAS")"
     calib_sha="$(probe calibration-sha256 "$CALIB")"
@@ -53,7 +61,7 @@ if [ "${1:-}" = "--record" ]; then
       echo "# B601 experiment pins. Written by pin_check.sh --record."
       echo "# Hand-edits are a behaviour-affecting change and require an"
       echo "# experiment-registry entry. Physical pins invalidate episodes."
-      echo "# Recorded with interpreter: $PY"
+      echo "PYTHON_EXECUTABLE=$pyexe"
       echo "LEROBOT_VERSION=$lerobot"
       echo "CAMERA_SERIALS=$cams"
       echo "CALIBRATION_SHA256=$calib_sha"
@@ -66,12 +74,22 @@ fi
 # --- verify ---------------------------------------------------------------
 [ -f "$PINS" ] || fail "no pins.env; run pin_check.sh --record after review"
 
+want_py="$(pin PYTHON_EXECUTABLE)"
 want_lerobot="$(pin LEROBOT_VERSION)"
 want_cams="$(pin CAMERA_SERIALS)"
 want_calib="$(pin CALIBRATION_SHA256)"
+[ -n "$want_py" ] || fail "PYTHON_EXECUTABLE unset in pins.env — recorded before the interpreter was pinned; re-record after review"
 [ -n "$want_lerobot" ] || fail "LEROBOT_VERSION unset in pins.env"
 [ -n "$want_cams" ]    || fail "CAMERA_SERIALS unset in pins.env"
 [ -n "$want_calib" ]   || fail "CALIBRATION_SHA256 unset in pins.env"
+
+# The interpreter first: every pin below is "as seen by THIS python", so a
+# mismatch here means the rest of the comparison is between two different
+# installations. B601_PY is a legitimate override — switching environments
+# between record and verify is not.
+have_py="$(probe python-executable)"
+[ "$have_py" = "$want_py" ] || \
+    fail "interpreter drift: pins recorded under $want_py, now running $have_py — set B601_PY to the recorded interpreter, or re-record with an experiment-registry entry"
 
 have_lerobot="$(probe lerobot-version)"
 [ "$have_lerobot" = "$want_lerobot" ] || \

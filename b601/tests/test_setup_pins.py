@@ -86,6 +86,75 @@ def test_probe_cli_exits_nonzero_on_failure(tmp_path):
     assert probe.main(["bogus-probe"]) == 64
 
 
+# --- the interpreter is itself a pin --------------------------------------
+#
+# B601_PY is a legitimate override: the robot PC may deliberately run a managed
+# environment rather than the repo venv. What is NOT legitimate is recording
+# the pins under one interpreter and verifying them under another — the gate
+# would then be comparing two different installations and calling it agreement.
+# The interpreter was previously written into pins.env as a COMMENT, which
+# `pin()` cannot read and verify never compared: recorded, but not gated.
+
+def test_python_executable_probe_reports_the_running_interpreter():
+    assert probe.python_executable() == sys.executable
+
+
+def test_python_executable_is_not_resolved_through_symlinks():
+    """A venv's python symlinks to the system interpreter. Resolving it would
+    make two different environments report the same path."""
+    assert probe.python_executable() == sys.executable
+    assert "python-executable" in probe._PROBES
+
+
+def pins_file(tmp_path, python_executable="/opt/conda/bin/python"):
+    """A pins.env recorded under some other interpreter."""
+    p = tmp_path / "pins.env"
+    body = f"LEROBOT_VERSION=1.0\nCAMERA_SERIALS=111\n" \
+           f"CALIBRATION_SHA256={'a' * 64}\n"
+    if python_executable is not None:
+        body = f"PYTHON_EXECUTABLE={python_executable}\n" + body
+    p.write_text(body)
+    return p
+
+
+def test_verify_fails_when_the_interpreter_differs_from_the_recorded_one(tmp_path):
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins_file(tmp_path)))
+    assert r.returncode == 1
+    assert "interpreter" in r.stderr
+    assert "/opt/conda/bin/python" in r.stderr, "must name the recorded one"
+
+
+def test_verify_fails_on_a_pins_file_recorded_before_the_interpreter_pin(tmp_path):
+    """Back-compat is not silence: an older pins.env must be re-recorded, not
+    verified against an unchecked interpreter."""
+    r = run(f"bash {PIN_CHECK}",
+            B601_PINS=str(pins_file(tmp_path, python_executable=None)))
+    assert r.returncode == 1
+    assert "PYTHON_EXECUTABLE" in r.stderr
+
+
+def test_the_interpreter_is_checked_before_the_other_pins(tmp_path):
+    """Cheapest and most fundamental: every other probe's answer depends on
+    which interpreter produced it, so a mismatch must abort first."""
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins_file(tmp_path)))
+    assert "lerobot" not in r.stderr.lower()
+
+
+def test_recorded_pins_carry_the_interpreter_as_a_gated_key(tmp_path):
+    """It used to be a '# Recorded with interpreter:' comment, which pin()
+    cannot read. A recorded-but-ungated value is not a pin."""
+    calib = tmp_path / "calib.json"
+    calib.write_text("{}")
+    cameras = tmp_path / "cameras.json"
+    cameras.write_text(json.dumps({"cameras": [{"serial": "111"}]}))
+    pins = tmp_path / "pins.env"
+    r = run(f"bash {PIN_CHECK} --record", B601_PINS=str(pins),
+            B601_CALIB=str(calib), B601_CAMERAS=str(cameras))
+    if r.returncode != 0:                    # lerobot is not installed here
+        pytest.skip(f"record needs the full stack: {r.stderr.strip()}")
+    assert f"PYTHON_EXECUTABLE={sys.executable}" in pins.read_text()
+
+
 # --- pin_check: uses the repo interpreter, fails loudly -------------------
 
 def test_pin_check_refuses_an_ambient_interpreter():

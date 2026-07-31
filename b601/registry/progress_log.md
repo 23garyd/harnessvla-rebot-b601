@@ -41,3 +41,27 @@ released checkpoint), but the vendored copies still carried sim assumptions:
 Fixed with 47 new tests (47 → 94). Divergence from the sim copies is recorded
 in `b601/analysis/VENDORED.md`; the zero-pair crash is latent upstream too.
 No limit VALUES changed — the envelope is still the provisional Day-0 one.
+
+### Day 0 addendum — chokepoint review (powered-motion blockers)
+
+A second external review went at the driver layer, where the previous round
+had not looked. Three gaps, all verified by direct execution before fixing:
+
+| Defect | Consequence had it survived |
+|---|---|
+| A driver exception escaped `SafeDriver.move_to` without latching | Verified: an injected overcurrent was followed by an **accepted** motion. Worse than the missing latch, `check_step` measures the next waypoint from `eef_pose()`, so after an incomplete motion every later check is computed from a stale pose |
+| Speed was bounded above only | Verified: `-5.0` and `NaN` both reached the driver (NaN fails every comparison; `inf` was already caught). The only guard in the module that did not reject NaN, while `check_pose`/`check_gripper`/`check_joint_velocity` all do |
+| `safe_home` unchecked, uncounted, unlatched | Not fixable here — see the risk log. Now fault-latched and counted, with the gap stated in the module docstring instead of contradicted by it |
+
+Same treatment applied to `set_gripper` and `safe_home`, which had the
+identical unlatched-exception hole; `BaseException`, so an operator Ctrl-C
+mid-motion latches like any other incomplete actuation.
+
+Also: `PYTHON_EXECUTABLE` is now a gated pin. `B601_PY` is a legitimate
+override (the robot PC may run a managed environment), but pins recorded under
+one interpreter and verified under another compare two installations and
+report agreement. It had been written into `pins.env` as a comment — recorded,
+never gated. Checked first, before every pin whose value depends on it.
+
+21 new tests (94 → 115). **Powered planner-controlled motion still waits on
+the Day-2 `safe_home` contract.**
