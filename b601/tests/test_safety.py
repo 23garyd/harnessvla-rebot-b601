@@ -10,7 +10,8 @@ from b601.driver.mock import MockDriver
 from b601.safety.limits import (MotionLimits, SafetyViolation, Workspace,
                                 check_cartesian_speed, check_command,
                                 check_gripper,
-                                check_joint_velocity, check_pose, check_step)
+                                check_joint_velocity, check_pose, check_step,
+                                check_timeout)
 
 # SYNTHETIC fixture, deliberately not loaded from b601/setup/limits.yaml.
 # These tests exercise the guard LOGIC, so they must not change meaning when
@@ -93,6 +94,14 @@ def test_bad_gripper_force_is_rejected(force):
 def test_invalid_cartesian_speed_is_rejected(speed):
     with pytest.raises(SafetyViolation, match="cartesian speed"):
         check_cartesian_speed(speed, LIM)
+
+
+@pytest.mark.parametrize("timeout", [
+    -1.0, 0.0, float("nan"), float("inf"), True, "soon",
+])
+def test_invalid_home_timeout_is_rejected(timeout):
+    with pytest.raises(SafetyViolation, match="safe_home timeout"):
+        check_timeout(timeout, "safe_home")
 
 
 def test_check_command_runs_every_guard():
@@ -217,15 +226,51 @@ def test_hardware_gripper_fault_latches_and_blocks_next_actuation():
         sd.set_gripper(0.4)
 
 
-def test_hardware_home_fault_latches_and_blocks_next_actuation():
+@pytest.mark.parametrize("timeout", [
+    -1.0, 0.0, float("nan"), float("inf"), True, "soon",
+])
+def test_invalid_home_timeout_never_reaches_driver(timeout):
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation, match="safe_home timeout"):
+        sd.safe_home(timeout_s=timeout)
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+
+
+def test_safe_home_forwards_bounds_and_counts_motion():
+    mock, sd = safe(start=(WS.x_max, 0.0, 0.35))
+    sd.safe_home(timeout_s=12.0)
+    assert mock.last("safe_home") == (
+        "safe_home", LIM.max_joint_velocity, 12.0)
+    assert sd.motions == 1
+
+
+def test_safe_home_fault_latches_and_blocks_later_motion():
     mock, sd = safe()
     mock.fault_on_next_home = "home switch fault"
     with pytest.raises(RuntimeError, match="switch fault"):
-        sd.safe_home()
+        sd.safe_home(timeout_s=12.0)
     assert "safe_home failed" in sd.faulted
     with pytest.raises(SafetyViolation, match="faulted"):
-        sd.safe_home()
+        sd.move_to((0.32, 0.0, 0.35))
     assert len([c for c in mock.commands if c[0] == "safe_home"]) == 1
+
+
+def test_safe_home_rejects_invalid_precondition_without_raw_motion():
+    mock, sd = safe(start=(float("nan"), 0.0, 0.35))
+    with pytest.raises(SafetyViolation, match="NaN"):
+        sd.safe_home(timeout_s=12.0)
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+
+
+def test_safe_home_rejects_invalid_postcondition():
+    mock, sd = safe()
+    mock.home_result = (float("nan"), 0.0, 0.35)
+    with pytest.raises(SafetyViolation, match="NaN"):
+        sd.safe_home(timeout_s=12.0)
+    assert sd.faulted is not None
+    assert sd.motions == 0
 
 
 def test_mock_models_empty_grasp_for_the_day16_verifier():

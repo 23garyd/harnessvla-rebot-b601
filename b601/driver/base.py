@@ -14,7 +14,8 @@ explicitly cleared. Primitives, planner and policy all talk to SafeDriver, so
 from abc import ABC, abstractmethod
 
 from b601.safety.limits import (SafetyViolation, check_cartesian_speed,
-                                check_command)
+                                check_command, check_joint_velocity,
+                                check_pose, check_timeout)
 
 
 class Driver(ABC):
@@ -46,8 +47,8 @@ class Driver(ABC):
         ...
 
     @abstractmethod
-    def safe_home(self):
-        """Return to the documented home pose at low speed."""
+    def safe_home(self, max_joint_velocity, timeout_s):
+        """Execute the approved bounded homing route and stop on timeout."""
 
 
 class SafeDriver:
@@ -127,6 +128,26 @@ class SafeDriver:
         blocked by the fault state that makes you want to disable."""
         self._d.disable()
 
-    def safe_home(self):
+    def safe_home(self, timeout_s=30.0):
         self._require_ok()
-        self._actuate("safe_home", self._d.safe_home)
+        try:
+            timeout_s = check_timeout(timeout_s, "safe_home")
+            check_pose(self._d.eef_pose(), self.workspace)
+            check_joint_velocity(
+                self._d.joint_state().get("velocities"), self.limits)
+        except SafetyViolation as exc:
+            self._faulted = exc.reason
+            raise
+
+        self._actuate(
+            "safe_home", self._d.safe_home,
+            self.limits.max_joint_velocity, timeout_s)
+
+        try:
+            check_pose(self._d.eef_pose(), self.workspace)
+            check_joint_velocity(
+                self._d.joint_state().get("velocities"), self.limits)
+        except SafetyViolation as exc:
+            self._faulted = f"safe_home postcondition: {exc.reason}"
+            raise
+        self.motions += 1
