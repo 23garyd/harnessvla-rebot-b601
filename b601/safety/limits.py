@@ -17,6 +17,8 @@ production code — this module stays pure so the guards can be tested without
 a filesystem, but "the limits live in YAML" is only true because something
 loads it.
 """
+import math
+import numbers
 from dataclasses import dataclass
 
 
@@ -57,6 +59,18 @@ class MotionLimits:
     max_cartesian_speed: float     # m/s, EEF
     max_step_distance: float       # m, per commanded waypoint
     max_gripper_force: float       # normalised 0-1
+
+
+def check_cartesian_speed(speed, limits):
+    if (isinstance(speed, bool)
+            or not isinstance(speed, numbers.Real)
+            or not math.isfinite(speed)
+            or speed <= 0.0
+            or speed > limits.max_cartesian_speed):
+        raise SafetyViolation(
+            "cartesian speed out of range",
+            f"{speed!r} not finite and in (0, {limits.max_cartesian_speed}]")
+    return float(speed)
 
 
 def check_pose(xyz, workspace):

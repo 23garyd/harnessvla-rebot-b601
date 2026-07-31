@@ -8,7 +8,8 @@ import pytest
 from b601.driver.base import SafeDriver
 from b601.driver.mock import MockDriver
 from b601.safety.limits import (MotionLimits, SafetyViolation, Workspace,
-                                check_command, check_gripper,
+                                check_cartesian_speed, check_command,
+                                check_gripper,
                                 check_joint_velocity, check_pose, check_step)
 
 # SYNTHETIC fixture, deliberately not loaded from b601/setup/limits.yaml.
@@ -86,6 +87,14 @@ def test_bad_gripper_force_is_rejected(force):
         check_gripper(force, LIM)
 
 
+@pytest.mark.parametrize("speed", [
+    -0.01, 0.0, float("nan"), float("inf"), True, "fast",
+])
+def test_invalid_cartesian_speed_is_rejected(speed):
+    with pytest.raises(SafetyViolation, match="cartesian speed"):
+        check_cartesian_speed(speed, LIM)
+
+
 def test_check_command_runs_every_guard():
     with pytest.raises(SafetyViolation, match="outside workspace"):
         check_command((0.30, 0.0, 0.20), (0.90, 0.0, 0.20), WS, LIM)
@@ -153,6 +162,23 @@ def test_speed_defaults_to_the_configured_maximum():
     mock, sd = safe()
     sd.move_to((0.32, 0.0, 0.35))
     assert mock.last("move_to")[2] == LIM.max_cartesian_speed
+
+
+@pytest.mark.parametrize("speed", [
+    -0.01, 0.0, float("nan"), float("inf"), True, "fast",
+])
+def test_invalid_speed_never_reaches_driver(speed):
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation, match="cartesian speed"):
+        sd.move_to((0.32, 0.0, 0.35), speed=speed)
+    assert mock.last("move_to") is None
+    assert sd.faulted is not None
+
+
+def test_valid_cartesian_speed_is_normalized_and_forwarded():
+    mock, sd = safe()
+    sd.move_to((0.32, 0.0, 0.35), speed=0.10)
+    assert mock.last("move_to")[2] == pytest.approx(0.10)
 
 
 def test_high_joint_velocity_blocks_the_move():

@@ -13,7 +13,8 @@ explicitly cleared. Primitives, planner and policy all talk to SafeDriver, so
 """
 from abc import ABC, abstractmethod
 
-from b601.safety.limits import SafetyViolation, check_command
+from b601.safety.limits import (SafetyViolation, check_cartesian_speed,
+                                check_command)
 
 
 class Driver(ABC):
@@ -86,10 +87,8 @@ class SafeDriver:
     def move_to(self, xyz, speed=None):
         self._require_ok()
         speed = self.limits.max_cartesian_speed if speed is None else speed
-        if speed > self.limits.max_cartesian_speed:
-            self._faulted = f"speed {speed} over limit"
-            raise SafetyViolation("cartesian speed over limit", speed)
         try:
+            speed = check_cartesian_speed(speed, self.limits)
             distance = check_command(
                 self._d.eef_pose(), xyz, self.workspace, self.limits,
                 joint_velocities=self._d.joint_state().get("velocities"))
