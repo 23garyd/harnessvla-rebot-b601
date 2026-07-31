@@ -25,6 +25,8 @@ class MockDriver(Driver):
         self.enabled = False
         self.commands = []          # full audit trail of what was sent
         self.fault_on_next_move = None
+        self.fault_on_next_gripper = None
+        self.fault_on_next_home = None
         self.grasp_succeeds = grasp_succeeds
         self.holding = False
 
@@ -45,6 +47,11 @@ class MockDriver(Driver):
         self._pose = tuple(xyz)
 
     def set_gripper(self, force):
+        if self.fault_on_next_gripper is not None:
+            fault, self.fault_on_next_gripper = (
+                self.fault_on_next_gripper, None)
+            self.commands.append(("set_gripper", force, "FAULT"))
+            raise RuntimeError(f"mock hardware fault: {fault}")
         self.commands.append(("set_gripper", force))
         self._gripper = force
         # Closing on a graspable object: holding iff the scenario says so.
@@ -62,6 +69,10 @@ class MockDriver(Driver):
         self.enabled = False
 
     def safe_home(self):
+        if self.fault_on_next_home is not None:
+            fault, self.fault_on_next_home = self.fault_on_next_home, None
+            self.commands.append(("safe_home", "FAULT"))
+            raise RuntimeError(f"mock hardware fault: {fault}")
         self.commands.append(("safe_home",))
         self._pose = HOME
 

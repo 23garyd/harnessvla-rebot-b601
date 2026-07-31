@@ -78,6 +78,14 @@ class SafeDriver:
             raise SafetyViolation("driver is faulted; clear_fault() first",
                                   self._faulted)
 
+    def _actuate(self, operation, function, *args):
+        try:
+            return function(*args)
+        except Exception as exc:
+            self._faulted = (
+                f"{operation} failed: {type(exc).__name__}: {exc}")
+            raise
+
     def joint_state(self):
         return self._d.joint_state()
 
@@ -97,7 +105,7 @@ class SafeDriver:
             # to produce the next one either.
             self._faulted = exc.reason
             raise
-        self._d.move_to(xyz, speed)
+        self._actuate("move_to", self._d.move_to, xyz, speed)
         self.motions += 1
         return distance
 
@@ -109,7 +117,7 @@ class SafeDriver:
         except SafetyViolation as exc:
             self._faulted = exc.reason
             raise
-        self._d.set_gripper(force)
+        self._actuate("set_gripper", self._d.set_gripper, force)
 
     def enable(self):
         self._d.enable()
@@ -121,4 +129,4 @@ class SafeDriver:
 
     def safe_home(self):
         self._require_ok()
-        self._d.safe_home()
+        self._actuate("safe_home", self._d.safe_home)

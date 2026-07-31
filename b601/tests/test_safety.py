@@ -196,12 +196,36 @@ def test_bad_gripper_force_never_reaches_the_driver():
     assert mock.last("set_gripper") is None
 
 
-def test_hardware_fault_propagates_and_is_recorded():
+def test_hardware_move_fault_latches_and_blocks_next_motion():
     mock, sd = safe()
     mock.fault_on_next_move = "joint 3 overcurrent"
     with pytest.raises(RuntimeError, match="overcurrent"):
         sd.move_to((0.32, 0.0, 0.35))
-    assert mock.last()[-1] == "FAULT"
+    assert "move_to failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.33, 0.0, 0.35))
+    assert len([c for c in mock.commands if c[0] == "move_to"]) == 1
+
+
+def test_hardware_gripper_fault_latches_and_blocks_next_actuation():
+    mock, sd = safe()
+    mock.fault_on_next_gripper = "gripper bus fault"
+    with pytest.raises(RuntimeError, match="bus fault"):
+        sd.set_gripper(0.5)
+    assert "set_gripper failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.set_gripper(0.4)
+
+
+def test_hardware_home_fault_latches_and_blocks_next_actuation():
+    mock, sd = safe()
+    mock.fault_on_next_home = "home switch fault"
+    with pytest.raises(RuntimeError, match="switch fault"):
+        sd.safe_home()
+    assert "safe_home failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.safe_home()
+    assert len([c for c in mock.commands if c[0] == "safe_home"]) == 1
 
 
 def test_mock_models_empty_grasp_for_the_day16_verifier():
