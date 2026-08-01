@@ -11,11 +11,29 @@ b601.safety.limits.check_command, enforces a separate bounded joint-space
 homing contract, and refuses to move after a fault until explicitly cleared.
 Primitives, planner and policy all talk to SafeDriver, so every motion reaches
 the appropriate safety boundary.
+
+WHAT THIS DOES NOT COVER, stated here rather than discovered later, per the
+risk log's rule that every guard declares its own blind spots:
+
+  - The homing TRAJECTORY. safe_home checks the state before and the state
+    after; the path between them is the vendor driver's, and this layer never
+    sees its waypoints. Bounds are passed down (max_joint_velocity, timeout)
+    and trusted.
+  - Timeout ENFORCEMENT. timeout_s is handed to the driver, not policed here.
+    A driver that ignores it will not be caught by SafeDriver.
+  - Acceleration. MotionLimits has no acceleration cap, so nothing here
+    constrains jerk on either a Cartesian move or a home.
+  - Collisions. Nothing in this layer perceives obstacles; the workspace box
+    is a permission, not a clearance guarantee.
+
+Each of these is a Day-2 item against the real driver, and the reason powered
+homing is gated on that work rather than on this file passing its tests.
 """
 from abc import ABC, abstractmethod
 
 from b601.safety.limits import (SafetyViolation, check_cartesian_speed,
-                                check_command, check_joint_state, check_pose,
+                                check_command, check_home_reached,
+                                check_joint_state, check_pose_reading,
                                 check_timeout)
 
 
@@ -58,10 +76,14 @@ class SafeDriver:
     checked one is required and nothing would complain.
     """
 
-    def __init__(self, driver, workspace, limits):
+    def __init__(self, driver, workspace, limits, home=None):
         self._d = driver
         self.workspace = workspace
         self.limits = limits
+        # Optional to CONSTRUCT (the Cartesian guards do not need it), but
+        # required to HOME: safe_home refuses rather than degrading to a
+        # weaker postcondition it could pass without arriving.
+        self.home = home
         self._faulted = None
         self.motions = 0
 
@@ -143,13 +165,25 @@ class SafeDriver:
         self._d.disable()
 
     def safe_home(self, timeout_s=30.0):
+        """Bounded joint-space homing. See the module docstring for the parts
+        of the contract this layer cannot enforce.
+
+        The precondition validates the pose as a READING, not as a target: an
+        arm outside the workspace must still be able to come home, since that
+        is the state homing exists to recover from. The postcondition asserts
+        arrival at the approved home configuration — "stopped somewhere legal"
+        is not the claim the next primitive needs.
+        """
         self._require_ok()
+        if self.home is None:
+            raise SafetyViolation(
+                "no approved home contract configured; "
+                "construct SafeDriver with one (b601.safety.config.load_home)")
         try:
             timeout_s = check_timeout(timeout_s, "safe_home")
-            check_pose(
+            check_pose_reading(
                 self._read_state(
-                    "safe_home pre eef_pose", self._d.eef_pose),
-                self.workspace)
+                    "safe_home pre eef_pose", self._d.eef_pose))
             check_joint_state(
                 self._read_state(
                     "safe_home pre joint_state", self._d.joint_state),
@@ -161,10 +195,10 @@ class SafeDriver:
             "safe_home", self._d.safe_home,
             self.limits.max_joint_velocity, timeout_s)
         try:
-            check_pose(
+            check_home_reached(
                 self._read_state(
                     "safe_home post eef_pose", self._d.eef_pose),
-                self.workspace)
+                self.home)
             check_joint_state(
                 self._read_state(
                     "safe_home post joint_state", self._d.joint_state),

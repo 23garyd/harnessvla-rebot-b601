@@ -64,6 +64,18 @@ class MotionLimits:
     max_gripper_force: float       # normalised 0-1
 
 
+@dataclass(frozen=True)
+class HomeContract:
+    """The approved home configuration, and how close counts as arrived.
+
+    Homing cannot be verified without this. "The arm stopped somewhere inside
+    the workspace" is not the same claim as "the arm came home", and only the
+    second one lets the next primitive assume a known starting pose.
+    """
+    xyz: tuple                     # approved home pose, robot base frame, m
+    tolerance_m: float             # arrival radius; boundary counts as home
+
+
 def check_cartesian_speed(speed, limits):
     if (isinstance(speed, bool)
             or not isinstance(speed, numbers.Real)
@@ -87,8 +99,14 @@ def check_timeout(timeout_s, operation):
     return float(timeout_s)
 
 
-def check_pose(xyz, workspace):
-    """Reject a target pose outside the workspace box."""
+def check_pose_reading(xyz):
+    """Validate a pose as a READING: shape, type, finiteness. No containment.
+
+    Split out from check_pose because "is this sensor value usable" and "is
+    this target allowed" are different questions, and homing needs the first
+    without the second — an arm parked outside the envelope must still be
+    able to come home. See SafeDriver.safe_home.
+    """
     try:
         xyz = tuple(xyz)
     except Exception as exc:
@@ -102,9 +120,38 @@ def check_pose(xyz, workspace):
         raise SafetyViolation("pose contains NaN", xyz)
     if any(not math.isfinite(v) for v in xyz):
         raise SafetyViolation("pose must contain finite numbers", xyz)
+    return xyz
+
+
+def check_pose(xyz, workspace):
+    """Reject a target pose outside the workspace box."""
+    xyz = check_pose_reading(xyz)
     if not workspace.contains(xyz):
         raise SafetyViolation("pose outside workspace", xyz)
     return xyz
+
+
+# A tolerance is a measured physical distance. Refusing a pose that exceeds it
+# by 1e-17 m would be reporting a floating-point artefact as a safety event,
+# so the inclusive boundary is compared with a slack far below any real
+# measurement (0.001 mm would already be optimistic for this arm).
+_TOLERANCE_EPS = 1e-9
+
+
+def check_home_reached(xyz, home):
+    """Reject a terminal pose that is not the approved home configuration.
+
+    Distance is compared inclusively: a pose exactly at the tolerance radius
+    counts as arrived, matching the half-open convention on Workspace.
+    """
+    xyz = check_pose_reading(xyz)
+    d = sum((a - b) ** 2 for a, b in zip(xyz, home.xyz)) ** 0.5
+    if d > home.tolerance_m + _TOLERANCE_EPS:
+        raise SafetyViolation(
+            "safe_home did not reach home",
+            f"{d:.4f} m from {tuple(home.xyz)} > tolerance "
+            f"{home.tolerance_m:.4f} m")
+    return d
 
 
 def check_step(current_xyz, target_xyz, limits):

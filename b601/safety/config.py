@@ -29,13 +29,14 @@ from pathlib import Path
 
 import yaml
 
-from b601.safety.limits import MotionLimits, Workspace
+from b601.safety.limits import HomeContract, MotionLimits, Workspace
 
 DEFAULT_LIMITS = Path(__file__).resolve().parents[1] / "setup" / "limits.yaml"
 
 _WORKSPACE_KEYS = ("x_min", "x_max", "y_min", "y_max", "z_min", "z_max")
 _MOTION_KEYS = ("max_joint_velocity", "max_cartesian_speed",
                 "max_step_distance", "max_gripper_force")
+_HOME_KEYS = ("xyz", "tolerance_m")
 
 
 class SafetyConfigError(Exception):
@@ -116,6 +117,77 @@ def load_limits(path=None):
     return Workspace(**workspace), MotionLimits(**motion)
 
 
+def _number(value, where):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise SafetyConfigError(f"{where} must be a number, got {value!r}")
+    if math.isnan(value):
+        raise SafetyConfigError(f"{where} is NaN")
+    if math.isinf(value):
+        raise SafetyConfigError(f"{where} is infinite")
+    return float(value)
+
+
+def load_home(path=None):
+    """-> HomeContract from `path`, default b601/setup/limits.yaml.
+
+    Separate from load_limits() on purpose: a Cartesian-only consumer must not
+    start failing because homing is misconfigured, and safe_home refuses to
+    run at all without this, so the two failure modes stay distinguishable.
+    """
+    path = Path(path) if path is not None else DEFAULT_LIMITS
+    if not path.is_file():
+        raise SafetyConfigError(f"safety limits not found: {path}")
+    try:
+        raw = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise SafetyConfigError(f"{path}: not valid YAML: {exc}") from exc
+
+    if not isinstance(raw, dict) or "home" not in raw:
+        raise SafetyConfigError(f"{path}: missing 'home' section")
+    section = raw["home"]
+    if not isinstance(section, dict):
+        raise SafetyConfigError(
+            f"{path}: 'home' must be a mapping, got {type(section).__name__}")
+    for key in _HOME_KEYS:
+        if key not in section:
+            raise SafetyConfigError(f"{path}: home missing '{key}'")
+    for key in section:
+        if key not in _HOME_KEYS:
+            raise SafetyConfigError(
+                f"{path}: home has unknown key '{key}'; expected "
+                f"{list(_HOME_KEYS)}")
+
+    xyz = section["xyz"]
+    if isinstance(xyz, (str, bytes)) or not isinstance(xyz, (list, tuple)):
+        raise SafetyConfigError(
+            f"{path}: home.xyz must be a list of three numbers, got {xyz!r}")
+    if len(xyz) != 3:
+        raise SafetyConfigError(
+            f"{path}: home.xyz must have three axes, got {len(xyz)}")
+    xyz = tuple(_number(v, f"{path}: home.xyz[{i}]") for i, v in enumerate(xyz))
+
+    tolerance = _number(section["tolerance_m"], f"{path}: home.tolerance_m")
+    if tolerance <= 0.0:
+        raise SafetyConfigError(
+            f"{path}: home.tolerance_m must be positive, got {tolerance}")
+
+    # A home the arm may not legally occupy makes every other guard
+    # unreachable — the first move away from it is already a violation.
+    workspace, _ = load_limits(path)
+    if not workspace.contains(xyz):
+        raise SafetyConfigError(
+            f"{path}: home.xyz {xyz} is outside the workspace")
+    # An arrival radius that spans the box accepts any terminal pose at all.
+    span = min(workspace.x_max - workspace.x_min,
+               workspace.y_max - workspace.y_min,
+               workspace.z_max - workspace.z_min)
+    if tolerance >= span / 2:
+        raise SafetyConfigError(
+            f"{path}: home.tolerance_m {tolerance} is not meaningfully "
+            f"tighter than the workspace (smallest half-span {span / 2})")
+    return HomeContract(xyz=xyz, tolerance_m=tolerance)
+
+
 def main(argv=None):
     """`python -m b601.safety.config [path]` — validate an envelope before use.
 
@@ -126,6 +198,7 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
         ws, lim = load_limits(argv[0] if argv else None)
+        home = load_home(argv[0] if argv else None)
     except SafetyConfigError as exc:
         print(f"SAFETY CONFIG INVALID: {exc}", file=sys.stderr)
         return 1
@@ -135,6 +208,7 @@ def main(argv=None):
           f"eef<={lim.max_cartesian_speed} m/s, "
           f"step<={lim.max_step_distance} m, "
           f"grip<={lim.max_gripper_force}")
+    print(f"home      {home.xyz} +/- {home.tolerance_m} m")
     return 0
 
 

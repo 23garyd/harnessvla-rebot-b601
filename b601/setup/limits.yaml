@@ -18,3 +18,7 @@ motion:
   max_cartesian_speed: 0.25   # m/s EEF
   max_step_distance: 0.15     # m per commanded waypoint
   max_gripper_force: 1.0      # normalised
+home:                 # approved home configuration; safe_home verifies arrival
+  xyz: [0.30, 0.00, 0.35]
+  tolerance_m: 0.02   # arrival radius — must exceed measured repeatability,
+                      # so Day 2 sets it FROM repeatability.csv, not before

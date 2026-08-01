@@ -11,11 +11,19 @@ B601. The learned primitive here is a B601-specific ACT policy trained from
 teleoperated demonstrations.
 
 ## Where things stand
-Day 0 scaffold. 115 tests green (`bash b601/setup/setup.sh verify`), no
+Day 0-2 software. 231 tests green (`bash b601/setup/setup.sh verify`), no
 hardware powered, no data collected.
 
-**Before powered motion:** `safe_home()` has no bounded contract yet (risk log,
-open). It is fault-latched and counted but not path-checked. Day-2 work.
+**Before powered motion:** `safe_home()` now guards its endpoints (timeout,
+preconditions, arrival at the approved `HomeContract`, fault latching) but the
+trajectory between them is still the vendor driver's — as are timeout
+enforcement, acceleration and collision. Risk log, open. Confirm the vendor
+homing routine honours the velocity bound before any powered homing.
+
+**Day-2 gate is NOT met** — no hardware has been powered. See the Day-2 entry
+in `b601/registry/progress_log.md` for the full remaining list; the largest
+items are `b601/driver/b601.py` against the vendor SDK, measured limits, and
+the twenty-motion repeatability run.
 
 ## Read first
 1. `docs/sim_findings_that_transfer.md` — measured results from the sim track

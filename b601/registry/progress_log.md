@@ -65,3 +65,73 @@ never gated. Checked first, before every pin whose value depends on it.
 
 21 new tests (94 → 115). **Powered planner-controlled motion still waits on
 the Day-2 `safe_home` contract.**
+
+## Day 1 — charter and safety boundary (2026-07-31)
+
+Recorded from what is verifiable in this repository. Where an item is a
+mentor or hardware event, it is marked unevidenced rather than assumed.
+
+| Day-1 deliverable | State |
+|---|---|
+| Project charter, scope, out-of-scope | `README.md`, `HANDOVER.md` — in scope: planner-staged frozen ACT primitive; explicitly out: running released LIBERO pi0.5 on the B601 |
+| Paper-mechanism → B601 mapping | `docs/reference_material.md` (RPent read at pin `6e4ba18`, run from never) and `docs/sim_findings_that_transfer.md` (seven measured sim findings, each with its B601 consequence) |
+| Data-flow diagram: instruction → perception → staging → ACT → verify → transport → retry | **Not present as a diagram.** The mapping exists in prose; a drawn flow does not |
+| Safety checklist, restricted workspace, speed/acceleration limits | `b601/setup/limits.yaml` (workspace + motion, all PROVISIONAL) enforced by `b601/safety/`; **no acceleration limit exists** |
+| Risk register | `b601/registry/risk_log.md`, four risks, two open |
+| Daily engineering-log template | This file's per-day convention |
+| System inventory (arm, CAN adapter, PSU, cameras, mounts, teleop, e-stop) | **Absent** — needs the hardware in front of you |
+| **Acceptance gate: mentor approves scope and safety controls before any powered autonomous motion** | **NOT EVIDENCED IN THIS REPOSITORY.** No sign-off record exists. Everything below is gated on it |
+
+## Day 2 — software half of bring-up (2026-08-01)
+
+No hardware was powered. What landed is the code Day 2 needs to *have* before
+the arm is switched on, so that on bring-up day the arm is the only new
+variable.
+
+**Safety chokepoint, hardened** (external review, two rounds — see the Day-0
+addenda for the first). This round:
+
+| Change | Why |
+|---|---|
+| Homing precondition no longer requires the current pose to be inside the workspace | It refused to home whenever the arm was out of bounds — after a fault, at power-on from an unknown pose, or when a bad estimate staged it outside. That is the state homing exists to recover from. The reading is still validated for shape and finiteness (`check_pose_reading`); only containment was dropped |
+| `safe_home` postcondition asserts arrival at an approved home | It previously accepted any terminal pose inside the workspace — "stopped somewhere legal", not "came home". `HomeContract` (pose + arrival radius) is now required to home at all; `SafeDriver` refuses rather than degrading to a check it could pass without arriving |
+| `home:` section added to `limits.yaml`, loaded by `load_home()` | The approved configuration is envelope data like everything else. **`tolerance_m` is the one number Day 2 must set FROM `repeatability.csv`** — an arrival radius tighter than the arm's measured repeatability would fault on every successful home |
+| `base.py` states its blind spots again | The section had been dropped while the docstring claimed "every motion reaches the appropriate safety boundary". Trajectory monitoring, timeout enforcement, acceleration and collision are all still uncovered, and now say so |
+
+**Repeatability harness** (`b601/bringup/repeatability.py`): five poses ×
+four cycles = the gate's twenty motions, logging commanded vs achieved, error
+per axis and Euclidean, duration, speed and faults to `repeatability.csv`,
+with per-pose statistics and a text error histogram. Two refusals are built in:
+
+- It **stops at the first fault** and reports *consecutive* clean motions.
+  Twenty motions counted across a fault is not the quantity the gate names.
+- It **cannot pass the gate by itself.** Collisions and manual corrections are
+  human observations; nothing in the process perceives them. `gate_status()`
+  requires an explicit operator attestation, so a green run can never be
+  mistaken for a gate someone actually watched.
+
+Dry run against `MockDriver`: 20/20 clean, gate correctly **NOT PASSED** —
+no operator attestation.
+
+**Vendor SDK located.** `Seeed-Projects/reBot-DevArm` is a CAD repository —
+STEP files, BOMs, assembly steps, no Python. The B601-RS control API is
+elsewhere: `vectorBH6/reBotArm_control_py` (RobStride motors for -RS, Damiao
+for -DM; `RebotArm.connect/enable_all/get_state/estop`, `JointGroup.send_pos_vel`,
+Pinocchio FK/IK), plus Seeed's Motorbridge Python SDK and the LeRobot
+integration wiki. Recorded in `docs/reference_material.md`.
+
+117 new tests (115 → 231, 1 skipped).
+
+### Day-2 gate: NOT MET
+
+| Requirement | State |
+|---|---|
+| Twenty consecutive low-speed motions, no fault, collision or manual correction | Not attempted — no hardware |
+| `B601Driver` against the vendor SDK | Not written; API now identified |
+| Wiring, zero position, motor IDs, CAN comms, gripper direction | Not done |
+| Measured workspace/velocity limits replacing the placeholders | `limits.yaml` still PROVISIONAL |
+| `home.tolerance_m` set from measured repeatability | Still a placeholder |
+| `lerobot` / torch / vendor SDK pins frozen; `pin_check.sh --record` | Not run; no `pins.env` |
+| Bring-up report, CAN/e-stop/unexpected-motion recovery checklist | Absent |
+| Five-pose repeatability log, evidence video | Harness exists; no data |
+| Mentor sign-off | Unevidenced |

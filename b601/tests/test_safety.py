@@ -7,7 +7,8 @@ import pytest
 
 from b601.driver.base import SafeDriver
 from b601.driver.mock import MockDriver
-from b601.safety.limits import (MotionLimits, SafetyViolation, Workspace,
+from b601.safety.limits import (HomeContract, MotionLimits, SafetyViolation,
+                                Workspace,
                                 check_cartesian_speed, check_command,
                                 check_gripper,
                                 check_joint_velocity, check_pose, check_step,
@@ -22,11 +23,14 @@ WS = Workspace(x_min=0.15, x_max=0.55, y_min=-0.30, y_max=0.30,
                z_min=0.02, z_max=0.50)
 LIM = MotionLimits(max_joint_velocity=1.0, max_cartesian_speed=0.25,
                    max_step_distance=0.15, max_gripper_force=1.0)
+# The approved home configuration. Homing without one cannot be verified: you
+# would only know the arm stopped somewhere legal, not that it came home.
+HOME = HomeContract(xyz=(0.30, 0.00, 0.35), tolerance_m=0.02)
 
 
 def safe(**kw):
     d = MockDriver(**kw)
-    return d, SafeDriver(d, WS, LIM)
+    return d, SafeDriver(d, WS, LIM, HOME)
 
 
 class UnsafeHomeVelocityMock(MockDriver):
@@ -266,7 +270,7 @@ def test_enable_is_blocked_while_faulted_but_disable_is_callable():
 @pytest.mark.parametrize("exception_type", [RuntimeError, KeyboardInterrupt])
 def test_raw_enable_failure_latches_and_blocks_later_enable(exception_type):
     mock = FailingEnableMock(exception_type)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(exception_type, match="enable failure"):
         sd.enable()
@@ -357,7 +361,7 @@ def test_hardware_gripper_fault_latches_and_blocks_next_actuation():
 def test_raw_state_read_failure_latches_and_blocks_later_motion(
         boundary, fail_call, accessor, exception_type):
     mock = FailingStateReadMock(accessor, fail_call, exception_type)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(exception_type, match="sensor read failure"):
         if boundary == "move_to":
@@ -385,7 +389,7 @@ def test_raw_state_read_failure_latches_and_blocks_later_motion(
 def test_keyboard_interrupt_latches_and_blocks_later_motion(
         operation, actuate):
     mock = InterruptingActuationMock(operation)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(KeyboardInterrupt, match="operator interrupt"):
         actuate(sd)
@@ -463,7 +467,7 @@ def test_safe_home_rejects_invalid_pose_postcondition():
 
 def test_safe_home_rejects_invalid_velocity_postcondition():
     mock = UnsafeHomeVelocityMock()
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
     with pytest.raises(SafetyViolation, match="joint velocity"):
         sd.safe_home(timeout_s=12.0)
     assert sd.faulted is not None
@@ -497,7 +501,7 @@ def test_safe_home_rejects_invalid_velocity_postcondition():
 def test_safe_home_malformed_state_latches_and_blocks_later_motion(
         poses, joint_states, raw_home_expected):
     mock = ScriptedStateMock(poses, joint_states)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(SafetyViolation):
         sd.safe_home(timeout_s=12.0)
@@ -531,7 +535,7 @@ def test_safe_home_rejects_incomplete_joint_state_at_each_boundary(
     )
     mock = ScriptedStateMock(
         [(0.30, 0.0, 0.35)] * 2, joint_states)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(SafetyViolation, match="joint state"):
         sd.safe_home(timeout_s=12.0)
@@ -558,7 +562,7 @@ def test_safe_home_rejects_missing_or_malformed_positions(invalid_state):
     }
     mock = ScriptedStateMock(
         [(0.30, 0.0, 0.35)] * 2, [invalid_state, valid_state])
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(SafetyViolation, match="joint state"):
         sd.safe_home(timeout_s=12.0)
@@ -592,7 +596,7 @@ def test_safe_home_rejects_invalid_joint_positions_at_each_boundary(
     )
     mock = ScriptedStateMock(
         [(0.30, 0.0, 0.35)] * 2, joint_states)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(SafetyViolation, match="joint position"):
         sd.safe_home(timeout_s=12.0)
@@ -628,13 +632,73 @@ def test_safe_home_rejects_invalid_joint_positions_at_each_boundary(
 def test_move_to_malformed_state_latches_without_raw_motion(
         poses, joint_states, target):
     mock = ScriptedStateMock(poses, joint_states)
-    sd = SafeDriver(mock, WS, LIM)
+    sd = SafeDriver(mock, WS, LIM, HOME)
 
     with pytest.raises(SafetyViolation):
         sd.move_to(target)
 
     assert sd.faulted is not None
     assert mock.last("move_to") is None
+
+
+# --- homing is a RECOVERY primitive --------------------------------------
+#
+# The precondition used to be check_pose(current, workspace), which refused to
+# home whenever the arm was outside the envelope — and latched a fault doing
+# it. That is the state you are in after a fault, at power-on from an unknown
+# pose, or when a bad perception estimate staged the arm out of bounds: the
+# exact moments homing exists for. The reading is still validated for shape
+# and finiteness; it is containment that must not gate recovery.
+
+def test_homing_is_permitted_from_outside_the_workspace():
+    mock, sd = safe(start=(0.95, 0.0, 0.35))
+    sd.safe_home(timeout_s=12.0)
+    assert mock.last("safe_home") is not None
+    assert sd.motions == 1
+    assert sd.faulted is None
+
+
+def test_homing_still_rejects_an_unreadable_pose():
+    """Recovery is not an excuse to skip validating the sensor."""
+    _, sd = safe(start=(float("nan"), 0.0, 0.35))
+    with pytest.raises(SafetyViolation, match="NaN"):
+        sd.safe_home(timeout_s=12.0)
+
+
+# --- the terminal state must be HOME, not merely legal ---------------------
+
+def test_safe_home_requires_an_approved_home_contract():
+    """Without one the postcondition can only say 'it stopped somewhere in
+    the box', which is not what 'came home' means."""
+    mock = MockDriver()
+    sd = SafeDriver(mock, WS, LIM)
+    with pytest.raises(SafetyViolation, match="home contract"):
+        sd.safe_home(timeout_s=12.0)
+    assert mock.last("safe_home") is None
+
+
+def test_safe_home_rejects_a_terminal_pose_away_from_home():
+    """In the workspace but not at home: the old postcondition passed this."""
+    mock, sd = safe()
+    mock.home_result = (0.50, 0.25, 0.10)
+    with pytest.raises(SafetyViolation, match="did not reach home"):
+        sd.safe_home(timeout_s=12.0)
+    assert sd.faulted is not None
+    assert sd.motions == 0
+
+
+def test_safe_home_accepts_a_terminal_pose_within_tolerance():
+    mock, sd = safe()
+    mock.home_result = (0.30 + 0.01, 0.0, 0.35)
+    sd.safe_home(timeout_s=12.0)
+    assert sd.motions == 1
+
+
+def test_home_tolerance_is_a_boundary_not_a_gap():
+    mock, sd = safe()
+    mock.home_result = (0.30 + HOME.tolerance_m, 0.0, 0.35)
+    sd.safe_home(timeout_s=12.0)
+    assert sd.motions == 1
 
 
 def test_safe_home_counts_successful_motion():

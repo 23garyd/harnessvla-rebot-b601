@@ -12,6 +12,13 @@ as each step is first performed, describes the one you actually built.
 - [ ] Enable, safe-home, verify joint state (Day 2)
 - [ ] Replace the provisional limits with measured ones, then validate the
       envelope: `PYTHONPATH= .venv/bin/python -m b601.safety.config` (Day 2)
+- [ ] Repeatability run — 5 poses × 4 cycles, the gate's twenty motions:
+      `PYTHONPATH= .venv/bin/python -m b601.bringup.repeatability --out artifacts/day2/repeatability.csv`
+      Add `--operator-confirmed` **only after** watching the run and seeing no
+      collision and no manual correction; the harness cannot see either, and
+      will not pass the gate without you saying so (Day 2)
+- [ ] Set `home.tolerance_m` in `limits.yaml` from the measured repeatability,
+      then re-validate the envelope (Day 2)
 - [ ] Camera start, serial verification, calibration check (Day 3)
 - [ ] `pin_check.sh` — expected output and what a failure means (Day 3)
 - [ ] Workspace reset and object placement (Day 6)

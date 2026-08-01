@@ -28,6 +28,32 @@ XYZ maps per camera, plus high-res variants. That two-camera structure maps
 1:1 onto a D435-fixed + D405-wrist setup, which is why that hardware choice is
 architecturally cheap here.
 
+## Vendor SDK for the B601-RS
+
+`github.com/Seeed-Projects/reBot-DevArm` is the **hardware** repository — STEP
+files, BOMs, assembly steps, community gallery. There is no Python in it. The
+control software is in other places:
+
+- `github.com/vectorBH6/reBotArm_control_py` — the Python control library, and
+  the one that matters here. `RebotArm(hw_yaml)` with `connect`, `set_zero`,
+  `enable_all` / `disable_all`, `get_state` / `get_positions` /
+  `get_velocities` / `get_torques`, `estop`, `disconnect`; joint groups
+  (`arm`, `gripper`) exposing `mode_pos_vel` / `send_pos_vel`, `mode_mit` /
+  `send_mit`, `mode_vel` / `send_vel`; Pinocchio forward/inverse kinematics
+  under `kinematics/`. Requires Python 3.10+, Ubuntu 22.04+, and a USB2CAN
+  bridge or CAN interface.
+- Seeed Motorbridge Python SDK (`motorbridge.seeedstudio.com`) — motor-level
+  read/write. **The -RS uses RobStride motors**; the -DM uses Damiao. Guides
+  written for one model do not transfer to the other at this layer.
+- LeRobot integration: `wiki.seeedstudio.com/rebot_arm_b601_rs_lerobot/`
+- ROS2 integration: `wiki.seeedstudio.com/rebot_arm_b601_rs_ros2_integration/`
+
+`b601/driver/b601.py` will adapt this to the `Driver` interface. Two mappings
+are not one-to-one and need deciding on hardware, not on paper: `eef_pose()`
+needs Pinocchio FK over the URDF, and `move_to(xyz, speed)` needs IK plus a
+bounded joint trajectory — the vendor API is joint-space (`send_pos_vel`),
+while `Driver` is Cartesian.
+
 ## Simulation track
 
 `docs/sim_findings_that_transfer.md` in this repo distils the measured results
