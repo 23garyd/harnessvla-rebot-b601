@@ -18,7 +18,7 @@
 set -euo pipefail
 
 REPO="${B601_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-PY="${B601_PY:-python3}"
+BOOTSTRAP_PY="${B601_BOOTSTRAP_PY:-python3}"
 VENV="$REPO/.venv"
 
 stage="${1:-all}"
@@ -28,7 +28,7 @@ esac
 
 do_env() {
     echo "=== env ==="
-    [ -d "$VENV" ] || "$PY" -m venv "$VENV"
+    [ -d "$VENV" ] || "$BOOTSTRAP_PY" -m venv "$VENV"
     "$VENV/bin/pip" install --quiet --upgrade pip
     "$VENV/bin/pip" install --quiet -r "$REPO/b601/setup/requirements.txt"
     echo "venv: $VENV"

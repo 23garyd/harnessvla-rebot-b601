@@ -6,24 +6,17 @@ Two implementations sit behind `Driver`:
   - `B601Driver`   (b601/driver/b601.py) — the vendor SDK, added on Day 2
 
 `SafeDriver` wraps EITHER of them and is the only thing the rest of the
-codebase is allowed to hold. It routes Cartesian motion through
-b601.safety.limits.check_command and refuses to move after a fault until
-explicitly cleared. Primitives, planner and policy all talk to SafeDriver.
-
-WHAT THIS DOES NOT COVER (stated here rather than implied, per the risk log):
-`safe_home()` is NOT path-checked. Homing is a joint-space trajectory whose
-intermediate poses this layer never sees, and a Cartesian per-waypoint step
-limit would reject legitimate homing while proving nothing about the path
-taken. Checking only its destination would be worse: coverage that looks real.
-Its bounded contract — approved home configuration, joint velocity and
-acceleration caps, trajectory monitoring, timeout, verified terminal joint
-state — belongs with the vendor driver and is a Day-2 deliverable. Until then
-`safe_home` is fault-latched and audited, not validated.
+codebase is allowed to hold. It routes Cartesian moves through
+b601.safety.limits.check_command, enforces a separate bounded joint-space
+homing contract, and refuses to move after a fault until explicitly cleared.
+Primitives, planner and policy all talk to SafeDriver, so every motion reaches
+the appropriate safety boundary.
 """
-import math
 from abc import ABC, abstractmethod
 
-from b601.safety.limits import SafetyViolation, check_command
+from b601.safety.limits import (SafetyViolation, check_cartesian_speed,
+                                check_command, check_joint_state, check_pose,
+                                check_timeout)
 
 
 class Driver(ABC):
@@ -55,8 +48,8 @@ class Driver(ABC):
         ...
 
     @abstractmethod
-    def safe_home(self):
-        """Return to the documented home pose at low speed."""
+    def safe_home(self, max_joint_velocity, timeout_s):
+        """Execute the approved bounded homing route and stop on timeout."""
 
 
 class SafeDriver:
@@ -87,20 +80,20 @@ class SafeDriver:
             raise SafetyViolation("driver is faulted; clear_fault() first",
                                   self._faulted)
 
-    def _actuate(self, what, call):
-        """Run a hardware call, latching a fault if it does not complete.
-
-        FAIL CLOSED. A driver exception means the motion did not finish as
-        commanded, so the arm is not where the last command said it was — and
-        check_step measures the next waypoint from eef_pose(). Continuing
-        would check the next command against a stale reading. BaseException,
-        not Exception: an operator Ctrl-C mid-motion leaves the arm in the
-        same uncertain state as a driver failure.
-        """
+    def _actuate(self, operation, function, *args):
         try:
-            return call()
+            return function(*args)
         except BaseException as exc:
-            self._faulted = f"hardware fault during {what}: {exc}"
+            self._faulted = (
+                f"{operation} failed: {type(exc).__name__}: {exc}")
+            raise
+
+    def _read_state(self, operation, function):
+        try:
+            return function()
+        except BaseException as exc:
+            self._faulted = (
+                f"{operation} failed: {type(exc).__name__}: {exc}")
             raise
 
     def joint_state(self):
@@ -112,26 +105,21 @@ class SafeDriver:
     def move_to(self, xyz, speed=None):
         self._require_ok()
         speed = self.limits.max_cartesian_speed if speed is None else speed
-        # Bounded on BOTH sides and required finite. Checking only the upper
-        # bound let NaN through (it fails every comparison) and negatives too,
-        # whose meaning is a vendor-SDK guess we must never take.
-        if (isinstance(speed, bool) or not isinstance(speed, (int, float))
-                or not math.isfinite(speed) or speed <= 0):
-            self._faulted = f"speed {speed!r} is not a positive finite value"
-            raise SafetyViolation("cartesian speed invalid", speed)
-        if speed > self.limits.max_cartesian_speed:
-            self._faulted = f"speed {speed} over limit"
-            raise SafetyViolation("cartesian speed over limit", speed)
         try:
+            speed = check_cartesian_speed(speed, self.limits)
+            joint_velocities = check_joint_state(
+                self._read_state("move_to joint_state", self._d.joint_state),
+                self.limits)
             distance = check_command(
-                self._d.eef_pose(), xyz, self.workspace, self.limits,
-                joint_velocities=self._d.joint_state().get("velocities"))
+                self._read_state("move_to eef_pose", self._d.eef_pose),
+                xyz, self.workspace, self.limits,
+                joint_velocities=joint_velocities)
         except SafetyViolation as exc:
             # Latch the fault: whatever produced this command is not trusted
             # to produce the next one either.
             self._faulted = exc.reason
             raise
-        self._actuate("move_to", lambda: self._d.move_to(xyz, speed))
+        self._actuate("move_to", self._d.move_to, xyz, speed)
         self.motions += 1
         return distance
 
@@ -143,21 +131,45 @@ class SafeDriver:
         except SafetyViolation as exc:
             self._faulted = exc.reason
             raise
-        self._actuate("set_gripper", lambda: self._d.set_gripper(force))
+        self._actuate("set_gripper", self._d.set_gripper, force)
 
     def enable(self):
-        self._d.enable()
+        self._require_ok()
+        self._actuate("enable", self._d.enable)
 
     def disable(self):
         """Always permitted, even when faulted — disabling must never be
         blocked by the fault state that makes you want to disable."""
         self._d.disable()
 
-    def safe_home(self):
-        """Return to the documented home pose. NOT path-checked — see the
-        module docstring for why, and for the Day-2 contract that must exist
-        before this is used under power. It is counted (it moves the arm) and
-        fault-latched (it can fail like any other motion)."""
+    def safe_home(self, timeout_s=30.0):
         self._require_ok()
-        self._actuate("safe_home", self._d.safe_home)
+        try:
+            timeout_s = check_timeout(timeout_s, "safe_home")
+            check_pose(
+                self._read_state(
+                    "safe_home pre eef_pose", self._d.eef_pose),
+                self.workspace)
+            check_joint_state(
+                self._read_state(
+                    "safe_home pre joint_state", self._d.joint_state),
+                self.limits)
+        except SafetyViolation as exc:
+            self._faulted = exc.reason
+            raise
+        self._actuate(
+            "safe_home", self._d.safe_home,
+            self.limits.max_joint_velocity, timeout_s)
+        try:
+            check_pose(
+                self._read_state(
+                    "safe_home post eef_pose", self._d.eef_pose),
+                self.workspace)
+            check_joint_state(
+                self._read_state(
+                    "safe_home post joint_state", self._d.joint_state),
+                self.limits)
+        except SafetyViolation as exc:
+            self._faulted = f"safe_home postcondition: {exc.reason}"
+            raise
         self.motions += 1

@@ -157,12 +157,15 @@ def test_recorded_pins_carry_the_interpreter_as_a_gated_key(tmp_path):
 
 # --- pin_check: uses the repo interpreter, fails loudly -------------------
 
-def test_pin_check_refuses_an_ambient_interpreter():
-    """P1: with no repo venv, pin_check must refuse rather than silently probe
-    whatever `python` happens to be on PATH (here: an unrelated conda env)."""
-    r = run(f"bash {PIN_CHECK}", B601_PY="/nonexistent/python")
+def test_pin_check_cannot_be_redirected_to_ambient_interpreter(tmp_path):
+    r = run(
+        f"bash {PIN_CHECK}",
+        B601_PY="/nonexistent/ambient-python",
+        B601_PINS=str(tmp_path / "absent.env"),
+    )
     assert r.returncode == 1
-    assert "no repository interpreter" in r.stderr
+    assert "no pins.env" in r.stderr
+    assert "no repository interpreter" not in r.stderr
 
 
 def test_pin_check_aborts_when_a_probe_fails(tmp_path):
@@ -202,6 +205,12 @@ def test_setup_rejects_unknown_stage():
     r = run(f"bash {SETUP} bogus")
     assert r.returncode == 64
     assert "usage" in r.stderr
+
+
+def test_setup_uses_distinct_bootstrap_interpreter_name():
+    text = SETUP.read_text()
+    assert "B601_BOOTSTRAP_PY" in text
+    assert "B601_PY" not in text
 
 
 def test_setup_has_no_stage_that_moves_the_robot():

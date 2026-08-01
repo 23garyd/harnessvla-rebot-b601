@@ -8,8 +8,10 @@ import pytest
 from b601.driver.base import SafeDriver
 from b601.driver.mock import MockDriver
 from b601.safety.limits import (MotionLimits, SafetyViolation, Workspace,
-                                check_command, check_gripper,
-                                check_joint_velocity, check_pose, check_step)
+                                check_cartesian_speed, check_command,
+                                check_gripper,
+                                check_joint_velocity, check_pose, check_step,
+                                check_timeout)
 
 # SYNTHETIC fixture, deliberately not loaded from b601/setup/limits.yaml.
 # These tests exercise the guard LOGIC, so they must not change meaning when
@@ -25,6 +27,80 @@ LIM = MotionLimits(max_joint_velocity=1.0, max_cartesian_speed=0.25,
 def safe(**kw):
     d = MockDriver(**kw)
     return d, SafeDriver(d, WS, LIM)
+
+
+class UnsafeHomeVelocityMock(MockDriver):
+    def safe_home(self, max_joint_velocity, timeout_s):
+        super().safe_home(max_joint_velocity, timeout_s)
+        self.set_velocities([9.0, 0, 0, 0, 0, 0])
+
+
+class InterruptingActuationMock(MockDriver):
+    def __init__(self, operation):
+        super().__init__()
+        self.operation = operation
+
+    def move_to(self, xyz, speed):
+        if self.operation == "move_to":
+            raise KeyboardInterrupt("operator interrupt")
+        return super().move_to(xyz, speed)
+
+    def set_gripper(self, force):
+        if self.operation == "set_gripper":
+            raise KeyboardInterrupt("operator interrupt")
+        return super().set_gripper(force)
+
+    def safe_home(self, max_joint_velocity, timeout_s):
+        if self.operation == "safe_home":
+            raise KeyboardInterrupt("operator interrupt")
+        return super().safe_home(max_joint_velocity, timeout_s)
+
+
+class ScriptedStateMock(MockDriver):
+    def __init__(self, poses, joint_states):
+        super().__init__()
+        self._poses = iter(poses)
+        self._joint_states = iter(joint_states)
+
+    def eef_pose(self):
+        return next(self._poses)
+
+    def joint_state(self):
+        return next(self._joint_states)
+
+
+class FailingStateReadMock(MockDriver):
+    def __init__(self, accessor, fail_call, exception_type):
+        super().__init__()
+        self.accessor = accessor
+        self.fail_call = fail_call
+        self.exception_type = exception_type
+        self.read_counts = {"eef_pose": 0, "joint_state": 0}
+
+    def _fail_if_requested(self, accessor):
+        self.read_counts[accessor] += 1
+        if (self.accessor == accessor
+                and self.read_counts[accessor] == self.fail_call):
+            raise self.exception_type("sensor read failure")
+
+    def eef_pose(self):
+        self._fail_if_requested("eef_pose")
+        return super().eef_pose()
+
+    def joint_state(self):
+        self._fail_if_requested("joint_state")
+        return super().joint_state()
+
+
+class FailingEnableMock(MockDriver):
+    def __init__(self, exception_type):
+        super().__init__()
+        self.exception_type = exception_type
+        self.enable_calls = 0
+
+    def enable(self):
+        self.enable_calls += 1
+        raise self.exception_type("enable failure")
 
 
 # --- pure limit checks ----------------------------------------------------
@@ -80,10 +156,42 @@ def test_nan_joint_velocity_is_rejected():
         check_joint_velocity([0.1, float("nan")], LIM)
 
 
+def test_malformed_pose_is_normalized_to_safety_violation():
+    with pytest.raises(SafetyViolation, match="pose"):
+        check_pose(None, WS)
+
+
+def test_malformed_joint_velocities_are_normalized_to_safety_violation():
+    with pytest.raises(SafetyViolation, match="joint velocity"):
+        check_joint_velocity(None, LIM)
+
+
 @pytest.mark.parametrize("force", [-0.1, 1.5, float("nan")])
 def test_bad_gripper_force_is_rejected(force):
     with pytest.raises(SafetyViolation):
         check_gripper(force, LIM)
+
+
+@pytest.mark.parametrize("speed", [
+    -0.01, 0.0, float("nan"), float("inf"), True, "fast",
+])
+def test_invalid_cartesian_speed_is_rejected(speed):
+    with pytest.raises(SafetyViolation, match="cartesian speed"):
+        check_cartesian_speed(speed, LIM)
+
+
+@pytest.mark.parametrize("timeout", [
+    -1.0, 0.0, float("nan"), float("inf"), True, "soon",
+])
+def test_invalid_home_timeout_is_rejected(timeout):
+    with pytest.raises(SafetyViolation, match="safe_home timeout"):
+        check_timeout(timeout, "safe_home")
+
+
+def test_valid_home_timeout_is_normalized_to_float():
+    timeout = check_timeout(12, "safe_home")
+    assert timeout == 12.0
+    assert isinstance(timeout, float)
 
 
 def test_check_command_runs_every_guard():
@@ -142,6 +250,38 @@ def test_disable_works_even_when_faulted():
     assert mock.enabled is False
 
 
+def test_enable_is_blocked_while_faulted_but_disable_is_callable():
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation):
+        sd.move_to((0.95, 0.0, 0.35))
+
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.enable()
+
+    assert mock.last("enable") is None
+    sd.disable()
+    assert mock.last("disable") == ("disable",)
+
+
+@pytest.mark.parametrize("exception_type", [RuntimeError, KeyboardInterrupt])
+def test_raw_enable_failure_latches_and_blocks_later_enable(exception_type):
+    mock = FailingEnableMock(exception_type)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(exception_type, match="enable failure"):
+        sd.enable()
+
+    assert "enable failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.enable()
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+    assert mock.enable_calls == 1
+    assert mock.last("move_to") is None
+    sd.disable()
+    assert mock.last("disable") == ("disable",)
+
+
 def test_speed_over_cartesian_limit_is_rejected():
     mock, sd = safe()
     with pytest.raises(SafetyViolation, match="cartesian speed"):
@@ -153,6 +293,23 @@ def test_speed_defaults_to_the_configured_maximum():
     mock, sd = safe()
     sd.move_to((0.32, 0.0, 0.35))
     assert mock.last("move_to")[2] == LIM.max_cartesian_speed
+
+
+@pytest.mark.parametrize("speed", [
+    -0.01, 0.0, float("nan"), float("inf"), True, "fast",
+])
+def test_invalid_speed_never_reaches_driver(speed):
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation, match="cartesian speed"):
+        sd.move_to((0.32, 0.0, 0.35), speed=speed)
+    assert mock.last("move_to") is None
+    assert sd.faulted is not None
+
+
+def test_valid_cartesian_speed_is_normalized_and_forwarded():
+    mock, sd = safe()
+    sd.move_to((0.32, 0.0, 0.35), speed=0.10)
+    assert mock.last("move_to")[2] == pytest.approx(0.10)
 
 
 def test_high_joint_velocity_blocks_the_move():
@@ -170,12 +327,320 @@ def test_bad_gripper_force_never_reaches_the_driver():
     assert mock.last("set_gripper") is None
 
 
-def test_hardware_fault_propagates_and_is_recorded():
+def test_hardware_move_fault_latches_and_blocks_next_motion():
     mock, sd = safe()
     mock.fault_on_next_move = "joint 3 overcurrent"
     with pytest.raises(RuntimeError, match="overcurrent"):
         sd.move_to((0.32, 0.0, 0.35))
-    assert mock.last()[-1] == "FAULT"
+    assert "move_to failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.33, 0.0, 0.35))
+    assert len([c for c in mock.commands if c[0] == "move_to"]) == 1
+
+
+def test_hardware_gripper_fault_latches_and_blocks_next_actuation():
+    mock, sd = safe()
+    mock.fault_on_next_gripper = "gripper bus fault"
+    with pytest.raises(RuntimeError, match="bus fault"):
+        sd.set_gripper(0.5)
+    assert "set_gripper failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.set_gripper(0.4)
+
+
+@pytest.mark.parametrize("exception_type", [RuntimeError, KeyboardInterrupt])
+@pytest.mark.parametrize("accessor", ["eef_pose", "joint_state"])
+@pytest.mark.parametrize(
+    ("boundary", "fail_call"),
+    [("move_to", 1), ("safe_home pre", 1), ("safe_home post", 2)],
+)
+def test_raw_state_read_failure_latches_and_blocks_later_motion(
+        boundary, fail_call, accessor, exception_type):
+    mock = FailingStateReadMock(accessor, fail_call, exception_type)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(exception_type, match="sensor read failure"):
+        if boundary == "move_to":
+            sd.move_to((0.32, 0.0, 0.35))
+        else:
+            sd.safe_home(timeout_s=12.0)
+
+    assert f"{boundary} {accessor} failed" in sd.faulted
+    assert (mock.last("safe_home") is not None) is (
+        boundary == "safe_home post")
+    assert mock.last("move_to") is None
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.33, 0.0, 0.35))
+
+
+@pytest.mark.parametrize(
+    ("operation", "actuate"),
+    [
+        ("move_to", lambda driver: driver.move_to((0.32, 0.0, 0.35))),
+        ("set_gripper", lambda driver: driver.set_gripper(0.5)),
+        ("safe_home", lambda driver: driver.safe_home(timeout_s=12.0)),
+    ],
+)
+def test_keyboard_interrupt_latches_and_blocks_later_motion(
+        operation, actuate):
+    mock = InterruptingActuationMock(operation)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(KeyboardInterrupt, match="operator interrupt"):
+        actuate(sd)
+
+    assert operation in sd.faulted
+    sd.disable()
+    assert mock.last("disable") == ("disable",)
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.33, 0.0, 0.35))
+
+
+@pytest.mark.parametrize("timeout", [
+    -1.0, 0.0, float("nan"), float("inf"), True, "soon",
+])
+def test_invalid_home_timeout_never_reaches_driver(timeout):
+    mock, sd = safe()
+    with pytest.raises(SafetyViolation, match="safe_home timeout"):
+        sd.safe_home(timeout_s=timeout)
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+
+
+def test_safe_home_forwards_velocity_and_normalized_timeout_bounds():
+    mock, sd = safe(start=(WS.x_max, 0.0, 0.35))
+    sd.safe_home(timeout_s=12)
+    assert mock.last("safe_home") == (
+        "safe_home", LIM.max_joint_velocity, 12.0)
+    assert isinstance(mock.last("safe_home")[2], float)
+
+
+def test_safe_home_uses_default_timeout_bound():
+    mock, sd = safe()
+    sd.safe_home()
+    assert mock.last("safe_home") == (
+        "safe_home", LIM.max_joint_velocity, 30.0)
+
+
+def test_safe_home_fault_latches_and_blocks_later_motion():
+    mock, sd = safe()
+    mock.fault_on_next_home = "home switch fault"
+    with pytest.raises(RuntimeError, match="switch fault"):
+        sd.safe_home(timeout_s=12.0)
+    assert "safe_home failed" in sd.faulted
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+    assert mock.last("safe_home") == (
+        "safe_home", LIM.max_joint_velocity, 12.0, "FAULT")
+
+
+def test_safe_home_rejects_invalid_pose_precondition_without_raw_motion():
+    mock, sd = safe(start=(float("nan"), 0.0, 0.35))
+    with pytest.raises(SafetyViolation, match="NaN"):
+        sd.safe_home(timeout_s=12.0)
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+
+
+def test_safe_home_rejects_invalid_velocity_precondition_without_raw_motion():
+    mock, sd = safe()
+    mock.set_velocities([9.0, 0, 0, 0, 0, 0])
+    with pytest.raises(SafetyViolation, match="joint velocity"):
+        sd.safe_home(timeout_s=12.0)
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+
+
+def test_safe_home_rejects_invalid_pose_postcondition():
+    mock, sd = safe()
+    mock.home_result = (float("nan"), 0.0, 0.35)
+    with pytest.raises(SafetyViolation, match="NaN"):
+        sd.safe_home(timeout_s=12.0)
+    assert sd.faulted is not None
+    assert sd.motions == 0
+
+
+def test_safe_home_rejects_invalid_velocity_postcondition():
+    mock = UnsafeHomeVelocityMock()
+    sd = SafeDriver(mock, WS, LIM)
+    with pytest.raises(SafetyViolation, match="joint velocity"):
+        sd.safe_home(timeout_s=12.0)
+    assert sd.faulted is not None
+    assert sd.motions == 0
+
+
+@pytest.mark.parametrize(
+    ("poses", "joint_states", "raw_home_expected"),
+    [
+        ([None], [{"positions": [0.0] * 6, "velocities": [0.0] * 6}], False),
+        (
+            [(0.30, 0.0, 0.35), None],
+            [
+                {"positions": [0.0] * 6, "velocities": [0.0] * 6},
+                {"positions": [0.0] * 6, "velocities": [0.0] * 6},
+            ],
+            True,
+        ),
+        ([(0.30, 0.0, 0.35)], [None], False),
+        (
+            [(0.30, 0.0, 0.35), (0.30, 0.0, 0.35)],
+            [
+                {"positions": [0.0] * 6, "velocities": [0.0] * 6},
+                {"positions": [0.0] * 6, "velocities": None},
+            ],
+            True,
+        ),
+    ],
+    ids=["pose-pre", "pose-post", "joint-state-pre", "joint-state-post"],
+)
+def test_safe_home_malformed_state_latches_and_blocks_later_motion(
+        poses, joint_states, raw_home_expected):
+    mock = ScriptedStateMock(poses, joint_states)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation):
+        sd.safe_home(timeout_s=12.0)
+
+    assert sd.faulted is not None
+    assert (mock.last("safe_home") is not None) is raw_home_expected
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
+@pytest.mark.parametrize("boundary", ["pre", "post"])
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        {"positions": [], "velocities": []},
+        {"positions": [0.0] * 6, "velocities": [0.0] * 5},
+        {"positions": [0.0] * 6, "velocities": [0.0] * 7},
+    ],
+    ids=["empty", "short-velocities", "long-velocities"],
+)
+def test_safe_home_rejects_incomplete_joint_state_at_each_boundary(
+        boundary, invalid_state):
+    valid_state = {
+        "positions": [0.0] * 6,
+        "velocities": [0.0] * 6,
+    }
+    joint_states = (
+        [invalid_state, valid_state] if boundary == "pre"
+        else [valid_state, invalid_state]
+    )
+    mock = ScriptedStateMock(
+        [(0.30, 0.0, 0.35)] * 2, joint_states)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation, match="joint state"):
+        sd.safe_home(timeout_s=12.0)
+
+    assert (mock.last("safe_home") is not None) is (boundary == "post")
+    assert sd.faulted is not None
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        {"velocities": [0.0] * 6},
+        {"positions": "000000", "velocities": [0.0] * 6},
+    ],
+    ids=["missing-positions", "string-positions"],
+)
+def test_safe_home_rejects_missing_or_malformed_positions(invalid_state):
+    valid_state = {
+        "positions": [0.0] * 6,
+        "velocities": [0.0] * 6,
+    }
+    mock = ScriptedStateMock(
+        [(0.30, 0.0, 0.35)] * 2, [invalid_state, valid_state])
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation, match="joint state"):
+        sd.safe_home(timeout_s=12.0)
+
+    assert mock.last("safe_home") is None
+    assert sd.faulted is not None
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
+@pytest.mark.parametrize("boundary", ["pre", "post"])
+@pytest.mark.parametrize(
+    "invalid_position",
+    [True, "zero", float("nan"), float("inf")],
+    ids=["boolean", "non-numeric", "nan", "infinite"],
+)
+def test_safe_home_rejects_invalid_joint_positions_at_each_boundary(
+        boundary, invalid_position):
+    valid_state = {
+        "positions": [0.0] * 6,
+        "velocities": [0.0] * 6,
+    }
+    invalid_state = {
+        "positions": [0.0, invalid_position, 0.0, 0.0, 0.0, 0.0],
+        "velocities": [0.0] * 6,
+    }
+    joint_states = (
+        [invalid_state, valid_state] if boundary == "pre"
+        else [valid_state, invalid_state]
+    )
+    mock = ScriptedStateMock(
+        [(0.30, 0.0, 0.35)] * 2, joint_states)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation, match="joint position"):
+        sd.safe_home(timeout_s=12.0)
+
+    assert (mock.last("safe_home") is not None) is (boundary == "post")
+    assert sd.faulted is not None
+    assert sd.motions == 0
+    with pytest.raises(SafetyViolation, match="faulted"):
+        sd.move_to((0.32, 0.0, 0.35))
+
+
+@pytest.mark.parametrize(
+    ("poses", "joint_states", "target"),
+    [
+        (
+            [(0.30, 0.0, 0.35)],
+            [{"positions": [0.0] * 6, "velocities": None}],
+            (0.32, 0.0, 0.35),
+        ),
+        (
+            [(0.30, 0.0, 0.35)],
+            [{"positions": [0.0] * 6, "velocities": [0.0] * 6}],
+            None,
+        ),
+        (
+            [None],
+            [{"positions": [0.0] * 6, "velocities": [0.0] * 6}],
+            (0.32, 0.0, 0.35),
+        ),
+    ],
+    ids=["joint-state", "target-pose", "current-pose"],
+)
+def test_move_to_malformed_state_latches_without_raw_motion(
+        poses, joint_states, target):
+    mock = ScriptedStateMock(poses, joint_states)
+    sd = SafeDriver(mock, WS, LIM)
+
+    with pytest.raises(SafetyViolation):
+        sd.move_to(target)
+
+    assert sd.faulted is not None
+    assert mock.last("move_to") is None
+
+
+def test_safe_home_counts_successful_motion():
+    _, sd = safe()
+    sd.safe_home(timeout_s=12.0)
+    assert sd.motions == 1
 
 
 # --- fail closed after uncertain actuation --------------------------------

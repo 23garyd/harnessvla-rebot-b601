@@ -8,17 +8,11 @@
 #   software  — the interpreter itself, then LeRobot version as seen by it
 #   physical  — camera serials, calibration file hash
 #
-# INTERPRETER: probes run under the repository venv by default, never an
-# ambient `python` — on a normal shell bare `python` can easily be a conda base
-# or system install carrying a different LeRobot. Resolution order: $B601_PY,
-# then .venv/bin/python, then fail.
-#
-# $B601_PY is a legitimate override (the robot PC may run a deliberately
-# managed environment), so the interpreter is PINNED rather than assumed:
-# recorded as PYTHON_EXECUTABLE and compared on every verify. Recording under
-# one environment and verifying under another compares two installations and
-# reports agreement. It used to be written as a comment, which pin() cannot
-# read and verify never checked — recorded, but not gated.
+# INTERPRETER: probes run under the repository venv, never an ambient `python`.
+# On a normal shell, bare `python` can easily be a conda base or system install
+# carrying a different LeRobot, which would silently gate on the wrong
+# environment. No interpreter override is accepted: use .venv/bin/python or
+# fail.
 #
 # NO SILENT FALLBACKS: a probe that cannot determine its value aborts. An
 # earlier version degraded to `|| echo UNKNOWN`, which recorded UNKNOWN and
@@ -36,8 +30,8 @@ case "${1:-}" in ""|--record) ;; *) usage ;; esac
 fail() { echo "FATAL: $*" >&2; exit 1; }
 
 # --- resolve the interpreter ---------------------------------------------
-PY="${B601_PY:-$REPO/.venv/bin/python}"
-[ -x "$PY" ] || fail "no repository interpreter at $PY — run 'bash b601/setup/setup.sh env' first, or set B601_PY"
+PY="$REPO/.venv/bin/python"
+[ -x "$PY" ] || fail "no repository interpreter at $PY — run 'bash b601/setup/setup.sh env' first"
 
 probe() {
     # $1 = probe name, $2 = optional path. Aborts on probe failure.
@@ -85,11 +79,10 @@ want_calib="$(pin CALIBRATION_SHA256)"
 
 # The interpreter first: every pin below is "as seen by THIS python", so a
 # mismatch here means the rest of the comparison is between two different
-# installations. B601_PY is a legitimate override — switching environments
-# between record and verify is not.
+# installations. This checker always uses the repository interpreter.
 have_py="$(probe python-executable)"
 [ "$have_py" = "$want_py" ] || \
-    fail "interpreter drift: pins recorded under $want_py, now running $have_py — set B601_PY to the recorded interpreter, or re-record with an experiment-registry entry"
+    fail "interpreter drift: pins recorded under $want_py, now running $have_py — restore the repository environment, or re-record with an experiment-registry entry"
 
 have_lerobot="$(probe lerobot-version)"
 [ "$have_lerobot" = "$want_lerobot" ] || \

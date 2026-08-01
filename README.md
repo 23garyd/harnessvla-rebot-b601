@@ -65,7 +65,9 @@ bash b601/setup/setup.sh verify       # the unpowered suite, in the repo venv
 Both commands run under the repository interpreter. Do not invoke them with an
 ambient `python`: on a machine with another environment on `PATH` that checks
 a different install than the one `setup.sh env` created, which is how a pin
-gate ends up verifying nothing. `B601_PY` overrides the interpreter if needed.
+gate ends up verifying nothing. If `python3` is not the intended interpreter
+for creating `.venv`, set `B601_BOOTSTRAP_PY` only on the `setup.sh env`
+invocation.
 
 ```bash
 # after editing the safety envelope (Day 2), before any powered motion
