@@ -27,7 +27,8 @@ pyyaml>=6.0
 # lerobot[kinematics] @ git+https://github.com/Seeed-Projects/lerobot@<pin at Day 2>
 #   [kinematics] pulls placo>=0.9.6,<0.10.0 — NOT a default dependency, and
 #   now safety-relevant: RobotKinematics is what computes eef_pose(), which
-#   the workspace guard checks against. Pin and gate it like any other.
+#   the workspace guard checks against. pin_check.sh gates PLACO_ORIGIN and
+#   SEEED_B601_ORIGIN alongside LEROBOT_ORIGIN for exactly that reason.
 # lerobot-robot-seeed-b601==1.0.0   # the B601 plugin; pulls python-can, motorbridge
 # torch==<CUDA build matching sm_120>
 

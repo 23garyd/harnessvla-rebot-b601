@@ -20,6 +20,9 @@ SETUP_DIR = Path(__file__).resolve().parent
 REPO = SETUP_DIR.parents[1]
 DEFAULT_CAMERAS = SETUP_DIR / "cameras.json"
 DEFAULT_CALIBRATION = SETUP_DIR / "calibration.json"
+# Not shipped here: the URDF lives with the vendor sources. Day 2 places a
+# copy or symlink at this path, or points B601_URDF at it.
+DEFAULT_URDF = SETUP_DIR / "urdf" / "b601_rs.urdf"
 
 
 class ProbeError(RuntimeError):
@@ -173,6 +176,36 @@ def camera_serials(path=None):
     return ",".join(sorted(serials))
 
 
+def urdf_sha256(path=None):
+    """Content hash of the kinematic description.
+
+    The URDF is experiment state in the same way the cameras are: every pose
+    the safety layer checks is FK over it, so a re-export moves workspace
+    containment, step distance and home arrival at once, silently. It lives
+    with the vendor sources rather than in this repository, which is exactly
+    why a hash is the only thing that notices it changing.
+    """
+    path = Path(path) if path else DEFAULT_URDF
+    if not path.is_file():
+        raise ProbeError(
+            f"URDF missing: {path}. Point B601_URDF at the vendor "
+            f"description (see docs/reference_material.md)")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def urdf_ee_frame(path=None):
+    """The end-effector frame the driver solves for.
+
+    Read from the driver rather than typed a second time here: a pin that can
+    drift from the value in use is not a pin. A different frame is a different
+    arm as far as every guard is concerned.
+    """
+    from b601.driver.b601 import URDF_EE_FRAME
+    if not URDF_EE_FRAME:
+        raise ProbeError("b601.driver.b601.URDF_EE_FRAME is empty")
+    return URDF_EE_FRAME
+
+
 def calibration_sha256(path=None):
     path = Path(path) if path else DEFAULT_CALIBRATION
     if not path.is_file():
@@ -180,10 +213,21 @@ def calibration_sha256(path=None):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _origin_probe(name):
+    if not name:
+        raise ProbeError(
+            "distribution-origin needs a distribution name, e.g. "
+            "`probe.py distribution-origin placo`")
+    return distribution_origin(name)
+
+
 _PROBES = {
     "python-executable": python_executable,
     "lerobot-version": lambda a: lerobot_version(),
     "lerobot-origin": lambda a: distribution_origin("lerobot"),
+    "distribution-origin": _origin_probe,
+    "urdf-sha256": urdf_sha256,
+    "urdf-ee-frame": urdf_ee_frame,
     "camera-serials": camera_serials,
     "calibration-sha256": calibration_sha256,
 }

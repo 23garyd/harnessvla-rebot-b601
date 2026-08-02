@@ -207,3 +207,28 @@ Verified against the real solver: targets converge to under 0.1 mm, and
 
 6 new tests (271 → 277). **New open risk: the URDF is unpinned** — every
 guarded pose is FK over it, and nothing detects it changing.
+
+### Day 2 addendum 3 — a third pin regime: the model
+
+`pin_check.sh` gated software and physical state. Neither covered the thing
+that now produces every checked pose. Four pins added, verified against the
+vendor URDF:
+
+| Pin | What it catches |
+|---|---|
+| `URDF_SHA256` | A re-exported or edited kinematic model. Measured on `00-arm-rs_asm-v3`: `2012b5aa3b58…`. The URDF is not in this repository, so the hash is the only thing that notices |
+| `URDF_EE_FRAME` | Solving for a different frame. Read from `b601.driver.b601.URDF_EE_FRAME` rather than typed a second time — a pin that can drift from the value in use is not a pin |
+| `PLACO_ORIGIN` | The solver that computes `eef_pose()`. `pypi:placo:0.9.23` here; not a default dependency, and safety-relevant the moment FK feeds the workspace guard |
+| `SEEED_B601_ORIGIN` | A forked or re-released B601 plugin |
+
+The origin probe is now generic (`distribution-origin <name>`), so one
+implementation covers lerobot, placo and the plugin, including the fork case:
+a published wheel and a git fork of it at the same version produce different
+pins.
+
+The regimes read: **software** (interpreter, lerobot codebase and version,
+solver libraries) → **model** (URDF hash, end-effector frame) → **physical**
+(camera serials, calibration hash). Checked in that order, because each later
+value is only meaningful under the earlier ones.
+
+14 new tests (277 → 291).

@@ -28,7 +28,7 @@ Day-2 measurement.
 | `b601/planner/` | the harness loop: stage → grasp → verify → retry → memory |
 | `b601/analysis/` | vendored from the sim repo — see `analysis/VENDORED.md` |
 | `b601/registry/` | experiment registry, risks, progress, deviations, dataset card, calibration |
-| `b601/setup/` | `pin_check.sh` (software **and** physical pins), limits, env |
+| `b601/setup/` | `pin_check.sh` (software, **model** and physical pins), limits, env |
 | `b601/bringup/` | Day-2 repeatability harness, gate check, FK cross-check |
 | `b601/tests/` | all runnable with the arm unpowered |
 | `datasets/` `checkpoints/` `artifacts/` | gitignored; hashes committed |

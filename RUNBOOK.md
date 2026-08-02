@@ -27,8 +27,14 @@ as each step is first performed, describes the one you actually built.
 - [ ] Set the plugin's `joint_limits` WIDER than `limits.yaml` so our envelope
       binds first, then verify a deliberately out-of-bounds command is
       REJECTED by us rather than clipped by the plugin (Day 2)
+- [ ] Place the vendor URDF where the gate can hash it — copy or symlink to
+      `b601/setup/urdf/b601_rs.urdf`, or set `B601_URDF`. Keep the vendor
+      `meshes/` alongside it: placo resolves mesh paths against the URDF file
+      and will not load without them (Day 2)
 - [ ] Freeze pins: `bash b601/setup/pin_check.sh --record` (needs a committed,
-      non-dirty lerobot checkout) (Day 2)
+      non-dirty lerobot checkout, and the URDF in place) (Day 2)
+- [ ] Re-record pins after ANY URDF re-export — the model change moves every
+      pose the safety layer checks, and is a registry event (Day 2 onward)
 - [ ] Camera start, serial verification, calibration check (Day 3)
 - [ ] `pin_check.sh` — expected output and what a failure means (Day 3)
 - [ ] Workspace reset and object placement (Day 6)
