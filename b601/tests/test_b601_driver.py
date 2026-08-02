@@ -180,6 +180,88 @@ def test_move_to_without_kinematics_fails_loudly():
         d.move_to((0.32, 0.0, 0.20), speed=0.1)
 
 
+# --- IK must be VERIFIED, not trusted -------------------------------------
+#
+# Measured against the real RobotKinematics on the vendor URDF: one
+# inverse_kinematics() call leaves up to 0.101 m of residual on a reachable
+# target, because placo's frame task is soft and the library solves once. It
+# converges to zero in three or four iterations.
+#
+# Unverified, move_to would send a joint command whose achieved pose is 10 cm
+# from the Cartesian target SafeDriver just approved — the chokepoint checking
+# one point while the arm goes to another.
+
+class DriftingIK:
+    """IK that approaches the target geometrically, like a soft solver."""
+
+    def __init__(self, factor=0.1, floor=0.0):
+        self.factor = factor
+        self.floor = floor
+        self.calls = 0
+
+    def __call__(self, xyz, q0_deg):
+        self.calls += 1
+        current_x = 0.30 + q0_deg[0] * 0.001
+        remaining = xyz[0] - current_x
+        step = remaining * (1 - self.factor) if abs(remaining) > self.floor \
+            else remaining
+        return [(current_x + step - 0.30) / 0.001] + list(q0_deg[1:])
+
+
+def test_move_to_iterates_until_fk_confirms_the_target():
+    ik = DriftingIK(factor=0.1)
+    robot, d = driver(ik=ik, ik_tolerance_m=1e-6)
+    d.move_to((0.35, 0.0, 0.20), speed=0.1)
+    assert ik.calls > 1, "one soft solve is not a solution"
+    achieved = flat_fk([robot.actions[-1]["shoulder_pan.pos"]] + [0] * 5)
+    assert achieved[0] == pytest.approx(0.35, abs=1e-6)
+
+
+def test_move_to_refuses_a_solution_that_does_not_reach_the_target():
+    """Fail closed. Sending a nearest-approximation is the clamp this
+    repository refuses to do, one layer down."""
+    robot, d = driver(ik=DriftingIK(factor=0.9, floor=0.02),
+                      ik_tolerance_m=1e-4, ik_max_iterations=5)
+    with pytest.raises(B601DriverError, match="did not converge"):
+        d.move_to((0.35, 0.0, 0.20), speed=0.1)
+    assert robot.actions == [], "an unconverged solution was sent"
+
+
+def test_the_convergence_failure_names_the_residual():
+    _, d = driver(ik=DriftingIK(factor=0.9, floor=0.02),
+                  ik_tolerance_m=1e-4, ik_max_iterations=3)
+    with pytest.raises(B601DriverError, match=r"0\.0\d+ m"):
+        d.move_to((0.35, 0.0, 0.20), speed=0.1)
+
+
+def test_each_iteration_seeds_the_next_with_the_previous_solution():
+    seen = []
+
+    def recording_ik(xyz, q0_deg):
+        seen.append(tuple(q0_deg))
+        return flat_ik(xyz, q0_deg)
+
+    robot, d = driver(StubRobot(positions_deg=[7, 0, 0, 0, 0, 0]),
+                      ik=recording_ik)
+    d.move_to((0.32, 0.0, 0.20), speed=0.1)
+    assert seen[0][0] == pytest.approx(7.0), "first guess is the current pose"
+
+
+def test_a_single_solve_that_lands_within_tolerance_sends_immediately():
+    ik = DriftingIK(factor=0.0)
+    robot, d = driver(ik=ik)
+    d.move_to((0.32, 0.0, 0.20), speed=0.1)
+    assert ik.calls == 1
+    assert len(robot.actions) == 1
+
+
+def test_verification_needs_fk_so_ik_alone_is_refused():
+    """Without FK there is no way to know where a joint solution lands."""
+    d = B601Driver(StubRobot(), ik=flat_ik)
+    with pytest.raises(B601DriverError, match="no kinematics"):
+        d.move_to((0.32, 0.0, 0.20), speed=0.1)
+
+
 def test_move_to_reports_an_unreachable_target_rather_than_sending_nothing():
     def failing_ik(xyz, q0):
         raise ValueError("no IK solution")

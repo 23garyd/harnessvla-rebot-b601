@@ -101,6 +101,36 @@ Two things it turned up:
   `staged_urdf()` stages a copy beside the meshes rather than editing the
   vendor file.
 
+**`RobotKinematics` has three non-obvious requirements**, each found by running
+it rather than reading it:
+
+- **`joint_names` must be passed.** Left to its default it takes
+  `robot.joint_names()`, which for this URDF is *eight* joints — `joint1..6`
+  plus the two prismatic gripper fingers — and then indexes a six-element
+  command vector out of range.
+- **It constructs `placo.RobotWrapper(urdf_path)` directly**, so it inherits
+  the mesh-resolution problem above. The URDF must be staged beside its meshes.
+- **`orientation_weight` defaults to 0.01**, i.e. IK also tries to reach a
+  target *orientation*. `Driver.move_to` carries no orientation, so the
+  identity rotation would be imposed as a silent goal. We pass 0.0.
+
+**One `inverse_kinematics()` call is not a solution.** placo's frame task is
+soft and the library solves once. Measured on this URDF, over reachable
+targets:
+
+| target | residual after 1 call | 2 | 3 | 4 |
+|---|---|---|---|---|
+| (0.32, 0.02, 0.25) | 0.002793 m | 0.000023 | 0.0 | 0.0 |
+| (0.30, 0.00, 0.30) | **0.101328 m** | 0.014051 | 0.000732 | 0.000001 |
+| (0.35, −0.05, 0.22) | **0.108301 m** | 0.010838 | 0.000720 | 0.000001 |
+
+Ten centimetres. `SafeDriver` validates the *requested* Cartesian pose, so an
+unverified solution would send the arm somewhere the chokepoint never
+approved. `B601Driver.move_to` therefore iterates and verifies with FK,
+refusing to send anything whose achieved pose is outside `ik_tolerance_m` —
+which doubles as the reachability check, since an unreachable target simply
+never converges.
+
 **The unverified assumption:** that the plugin's motor order corresponds to
 `joint1..joint6`. Nothing enforces it, and a wrong order gives poses that look
 plausible and are wrong everywhere except home. Confirm joint-by-joint on Day 2.

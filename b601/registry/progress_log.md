@@ -180,3 +180,30 @@ URDF FK check, both environment-dependent).
 
 **Still not started:** CAN bring-up, measured limits, the twenty-motion run,
 the motor-order confirmation, mentor sign-off. The Day-2 gate is unchanged.
+
+### Day 2 addendum 2 — verifying the adapter against the real library
+
+`from_urdf()` had been written against an API read from documentation rather
+than source. Shimming the real `lerobot.model.kinematics` over the vendor URDF
+found three defects in it and one in the library's usage contract:
+
+| Defect | Effect |
+|---|---|
+| `joint_names` not passed | `RobotKinematics` defaults to `robot.joint_names()` — eight joints for this URDF, including the two prismatic gripper fingers — then indexes a six-element vector out of range |
+| URDF passed unstaged | It constructs `placo.RobotWrapper` directly, so it inherits the mesh-resolution failure; construction raised |
+| `orientation_weight` left at its 0.01 default | IK also chases a target *orientation*. `move_to` carries none, so identity rotation was being imposed as a silent goal |
+| **One `inverse_kinematics()` call is not a solution** | placo's frame task is soft and the library solves once. Measured: up to **0.101 m** residual on a reachable target, converging to zero in three or four iterations |
+
+The last one is the serious one. `SafeDriver` validates the *requested*
+Cartesian pose; sending an unverified joint solution would have put the arm up
+to 10 cm from the point the chokepoint approved — the guard checking one
+place while the arm goes to another. `move_to` now iterates and verifies the
+solution with FK, refusing to send anything outside `ik_tolerance_m`. That
+same check is the reachability test: an unreachable target never converges and
+is rejected rather than approximated, which is Rule 1 one layer down.
+
+Verified against the real solver: targets converge to under 0.1 mm, and
+`(2.0, 0.0, 0.3)` is refused with a 1.98 m residual.
+
+6 new tests (271 → 277). **New open risk: the URDF is unpinned** — every
+guarded pose is FK over it, and nothing detects it changing.

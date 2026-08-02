@@ -44,6 +44,12 @@ LEROBOT_MOTOR_ORDER = ("shoulder_pan", "shoulder_lift", "elbow_flex",
 
 GRIPPER_MOTOR = "gripper"
 
+# From the vendor's config/rebotarm_rs.yaml. The URDF also carries two
+# prismatic gripper fingers, which FK of the end-effector frame ignores and
+# which must be kept OUT of the solver's joint list.
+URDF_ARM_JOINTS = ("joint1", "joint2", "joint3", "joint4", "joint5", "joint6")
+URDF_EE_FRAME = "gripper_end"
+
 
 class B601DriverError(RuntimeError):
     """The vendor stack could not satisfy a request. Never swallowed."""
@@ -59,11 +65,18 @@ class B601Driver(Driver):
     """
 
     def __init__(self, robot, fk=None, ik=None,
-                 motor_order=LEROBOT_MOTOR_ORDER, gripper_travel_deg=None):
+                 motor_order=LEROBOT_MOTOR_ORDER, gripper_travel_deg=None,
+                 ik_tolerance_m=1e-4, ik_max_iterations=10):
         self._r = robot
         self._fk = fk
         self._ik = ik
         self.motor_order = tuple(motor_order)
+        # A joint solution is only usable if we know where it puts the arm.
+        # Measured on the real solver: ONE inverse_kinematics() call leaves up
+        # to 0.101 m of residual, converging to zero in three or four. See
+        # move_to.
+        self.ik_tolerance_m = ik_tolerance_m
+        self.ik_max_iterations = ik_max_iterations
         # (open_deg, closed_deg). The force-to-position mapping is measured on
         # hardware; there is no defensible default.
         self.gripper_travel_deg = gripper_travel_deg
@@ -71,31 +84,57 @@ class B601Driver(Driver):
     # --- construction -----------------------------------------------------
 
     @classmethod
-    def from_urdf(cls, robot, urdf_path, ee_frame="gripper_end", **kw):
+    def from_urdf(cls, robot, urdf_path, ee_frame=URDF_EE_FRAME,
+                  urdf_joints=URDF_ARM_JOINTS, orientation_weight=0.0, **kw):
         """Wire FK/IK to LeRobot's RobotKinematics (placo).
 
         Imported lazily: the unpowered suite must not need placo, and this
         repository's own tests inject stubs instead.
+
+        Three things here are not defaults, each verified against the real
+        RobotKinematics source rather than assumed:
+
+        `urdf_joints` MUST be passed. Left to its default, RobotKinematics
+        takes `robot.joint_names()`, which for this URDF is eight joints —
+        joint1..joint6 plus the two prismatic gripper fingers — and it would
+        then index a six-element command vector out of range.
+
+        The URDF is staged beside its meshes. RobotKinematics constructs
+        `placo.RobotWrapper(urdf_path)` directly, and placo resolves
+        `filename="meshes/..."` against the URDF file's own directory; the
+        vendor ships it one level below. Unstaged, construction fails.
+
+        `orientation_weight` defaults to 0.0 — POSITION ONLY. The library's
+        own default is 0.01, which asks IK to also reach a target orientation;
+        `Driver.move_to` carries no orientation, so an identity rotation would
+        be silently imposed as a goal and distort every solution.
         """
+        import numpy as np
+
         try:
             from lerobot.model.kinematics import RobotKinematics
         except ImportError as exc:
             raise B601DriverError(
                 "lerobot.model.kinematics is unavailable; install "
                 '"lerobot[kinematics]" (placo). ' + str(exc)) from exc
-        solver = RobotKinematics(urdf_path=str(urdf_path),
-                                 target_frame_name=ee_frame)
+
+        from b601.bringup.kinematics_check import staged_urdf
+        with staged_urdf(urdf_path) as staged:
+            solver = RobotKinematics(urdf_path=str(staged),
+                                     target_frame_name=ee_frame,
+                                     joint_names=list(urdf_joints))
 
         def fk(q_deg):
-            T = solver.forward_kinematics(list(q_deg))
-            return (float(T[0][3]), float(T[1][3]), float(T[2][3]))
+            T = solver.forward_kinematics(np.asarray(q_deg, dtype=float))
+            return (float(T[0, 3]), float(T[1, 3]), float(T[2, 3]))
 
         def ik(xyz, q0_deg):
-            target = [[1.0, 0.0, 0.0, xyz[0]],
-                      [0.0, 1.0, 0.0, xyz[1]],
-                      [0.0, 0.0, 1.0, xyz[2]],
-                      [0.0, 0.0, 0.0, 1.0]]
-            return list(solver.inverse_kinematics(list(q0_deg), target))
+            target = np.eye(4)
+            target[0, 3], target[1, 3], target[2, 3] = (float(v) for v in xyz)
+            solved = solver.inverse_kinematics(
+                np.asarray(q0_deg, dtype=float), target,
+                orientation_weight=orientation_weight)
+            return [float(v) for v in solved]
 
         return cls(robot, fk=fk, ik=ik, **kw)
 
@@ -159,21 +198,45 @@ class B601Driver(Driver):
         already bounded the requested speed; matching the configured value to
         that bound is a Day-2 configuration step, recorded in the runbook.
         """
-        if self._ik is None:
+        if self._ik is None or self._fk is None:
             raise B601DriverError(
-                "no kinematics configured: move_to() needs a URDF. Build "
-                "with B601Driver.from_urdf(robot, urdf_path).")
+                "no kinematics configured: move_to() needs a URDF for both IK "
+                "and the FK that verifies its answer. Build with "
+                "B601Driver.from_urdf(robot, urdf_path).")
         current_deg, _ = self.snapshot()
-        try:
-            target_deg = list(self._ik(xyz, current_deg))
-        except Exception as exc:
-            # Nothing is sent. A partially-solved target is not a target.
+
+        # Solve, then CHECK WHERE THE SOLUTION LANDS. placo's frame task is
+        # soft and RobotKinematics solves once: measured on the vendor URDF, a
+        # single call left up to 0.101 m of residual on a reachable target.
+        # SafeDriver validated the requested pose; sending an unverified
+        # solution would send the arm somewhere else entirely.
+        target_deg = list(current_deg)
+        for _ in range(self.ik_max_iterations):
+            try:
+                target_deg = list(self._ik(xyz, target_deg))
+            except Exception as exc:
+                # Nothing is sent. A partially-solved target is not a target.
+                raise B601DriverError(
+                    f"inverse kinematics failed for {tuple(xyz)}: "
+                    f"{exc}") from exc
+            if len(target_deg) != len(self.motor_order):
+                raise B601DriverError(
+                    f"IK returned {len(target_deg)} joints, expected "
+                    f"{len(self.motor_order)}")
+            achieved = self._forward(target_deg)
+            residual = sum((a - b) ** 2
+                           for a, b in zip(achieved, xyz)) ** 0.5
+            if residual <= self.ik_tolerance_m:
+                break
+        else:
+            # Fail closed. Sending the nearest approximation would be the
+            # clamp this repository refuses to do, one layer down.
             raise B601DriverError(
-                f"inverse kinematics failed for {tuple(xyz)}: {exc}") from exc
-        if len(target_deg) != len(self.motor_order):
-            raise B601DriverError(
-                f"IK returned {len(target_deg)} joints, expected "
-                f"{len(self.motor_order)}")
+                f"inverse kinematics did not converge on {tuple(xyz)}: "
+                f"{residual:.6f} m residual after {self.ik_max_iterations} "
+                f"iterations, tolerance {self.ik_tolerance_m:.6f} m. The "
+                f"target may be unreachable; nothing was sent.")
+
         self._r.send_action({f"{m}.pos": float(v)
                              for m, v in zip(self.motor_order, target_deg)})
 
