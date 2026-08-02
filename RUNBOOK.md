@@ -19,6 +19,16 @@ as each step is first performed, describes the one you actually built.
       will not pass the gate without you saying so (Day 2)
 - [ ] Set `home.tolerance_m` in `limits.yaml` from the measured repeatability,
       then re-validate the envelope (Day 2)
+- [ ] Confirm the plugin's motor order matches URDF `joint1..joint6` — move one
+      joint at a time and check the reported axis. A wrong order gives poses
+      that look plausible and are wrong everywhere but home (Day 2)
+- [ ] Cross-check FK against the shipped URDF before trusting any pose:
+      `PYTHONPATH= .venv/bin/python -m b601.bringup.kinematics_check <urdf>` (Day 2)
+- [ ] Set the plugin's `joint_limits` WIDER than `limits.yaml` so our envelope
+      binds first, then verify a deliberately out-of-bounds command is
+      REJECTED by us rather than clipped by the plugin (Day 2)
+- [ ] Freeze pins: `bash b601/setup/pin_check.sh --record` (needs a committed,
+      non-dirty lerobot checkout) (Day 2)
 - [ ] Camera start, serial verification, calibration check (Day 3)
 - [ ] `pin_check.sh` — expected output and what a failure means (Day 3)
 - [ ] Workspace reset and object placement (Day 6)

@@ -5,7 +5,8 @@
 # PHYSICAL configuration is experiment state too — the plan is explicit that a
 # changed camera invalidates affected episodes and evaluations.
 #
-#   software  — the interpreter itself, then LeRobot version as seen by it
+#   software  — the interpreter, then the LeRobot CODEBASE (origin: fork URL
+#               and commit, not just a version string), then its version
 #   physical  — camera serials, calibration file hash
 #
 # INTERPRETER: probes run under the repository venv, never an ambient `python`.
@@ -49,6 +50,7 @@ pin() { grep -E "^$1=" "$PINS" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 if [ "${1:-}" = "--record" ]; then
     pyexe="$(probe python-executable)"
     lerobot="$(probe lerobot-version)"
+    lerobot_origin="$(probe lerobot-origin)"
     cams="$(probe camera-serials "$CAMERAS")"
     calib_sha="$(probe calibration-sha256 "$CALIB")"
     {
@@ -57,6 +59,7 @@ if [ "${1:-}" = "--record" ]; then
       echo "# experiment-registry entry. Physical pins invalidate episodes."
       echo "PYTHON_EXECUTABLE=$pyexe"
       echo "LEROBOT_VERSION=$lerobot"
+      echo "LEROBOT_ORIGIN=$lerobot_origin"
       echo "CAMERA_SERIALS=$cams"
       echo "CALIBRATION_SHA256=$calib_sha"
     } > "$PINS.tmp"
@@ -70,10 +73,12 @@ fi
 
 want_py="$(pin PYTHON_EXECUTABLE)"
 want_lerobot="$(pin LEROBOT_VERSION)"
+want_lerobot_origin="$(pin LEROBOT_ORIGIN)"
 want_cams="$(pin CAMERA_SERIALS)"
 want_calib="$(pin CALIBRATION_SHA256)"
 [ -n "$want_py" ] || fail "PYTHON_EXECUTABLE unset in pins.env — recorded before the interpreter was pinned; re-record after review"
 [ -n "$want_lerobot" ] || fail "LEROBOT_VERSION unset in pins.env"
+[ -n "$want_lerobot_origin" ] || fail "LEROBOT_ORIGIN unset in pins.env — recorded before the codebase was pinned; re-record after review"
 [ -n "$want_cams" ]    || fail "CAMERA_SERIALS unset in pins.env"
 [ -n "$want_calib" ]   || fail "CALIBRATION_SHA256 unset in pins.env"
 
@@ -83,6 +88,12 @@ want_calib="$(pin CALIBRATION_SHA256)"
 have_py="$(probe python-executable)"
 [ "$have_py" = "$want_py" ] || \
     fail "interpreter drift: pins recorded under $want_py, now running $have_py — restore the repository environment, or re-record with an experiment-registry entry"
+
+# Origin before version: a version string cannot tell the Seeed fork from
+# upstream HuggingFace, and an editable install does not move it at all.
+have_lerobot_origin="$(probe lerobot-origin)"
+[ "$have_lerobot_origin" = "$want_lerobot_origin" ] || \
+    fail "lerobot codebase drift: pinned $want_lerobot_origin, now $have_lerobot_origin — episodes recorded under a different lerobot cannot be compared; see b601/registry/experiment_registry.md"
 
 have_lerobot="$(probe lerobot-version)"
 [ "$have_lerobot" = "$want_lerobot" ] || \
@@ -96,4 +107,4 @@ have_calib="$(probe calibration-sha256 "$CALIB")"
 [ "$have_calib" = "$want_calib" ] || \
     fail "calibration hash drift — recalibrate or re-record the pin, do NOT ignore"
 
-echo "pin check OK: lerobot $have_lerobot, cameras $have_cams, calibration ${have_calib:0:12} (interpreter $PY)"
+echo "pin check OK: lerobot $have_lerobot ($have_lerobot_origin), cameras $have_cams, calibration ${have_calib:0:12} (interpreter $PY)"

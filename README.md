@@ -21,7 +21,7 @@ Day-2 measurement.
 | path | what |
 |---|---|
 | `b601/safety/` | workspace + motion limits (`config.py` loads and validates `limits.yaml`). **Every motion routes through here** |
-| `b601/driver/` | driver interface, `SafeDriver` chokepoint, mock (no hardware) |
+| `b601/driver/` | driver interface, `SafeDriver` chokepoint, mock, B601 adapter |
 | `b601/cameras/` | capture config, calibration, sync checking |
 | `b601/primitives/` | analytic observe / stage / transport / release / verify |
 | `b601/policy/` | ACT training and the frozen inference server |
@@ -29,7 +29,7 @@ Day-2 measurement.
 | `b601/analysis/` | vendored from the sim repo — see `analysis/VENDORED.md` |
 | `b601/registry/` | experiment registry, risks, progress, deviations, dataset card, calibration |
 | `b601/setup/` | `pin_check.sh` (software **and** physical pins), limits, env |
-| `b601/bringup/` | Day-2 repeatability harness and its gate check |
+| `b601/bringup/` | Day-2 repeatability harness, gate check, FK cross-check |
 | `b601/tests/` | all runnable with the arm unpowered |
 | `datasets/` `checkpoints/` `artifacts/` | gitignored; hashes committed |
 

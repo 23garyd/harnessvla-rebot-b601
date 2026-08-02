@@ -48,11 +48,62 @@ control software is in other places:
 - LeRobot integration: `wiki.seeedstudio.com/rebot_arm_b601_rs_lerobot/`
 - ROS2 integration: `wiki.seeedstudio.com/rebot_arm_b601_rs_ros2_integration/`
 
-`b601/driver/b601.py` will adapt this to the `Driver` interface. Two mappings
-are not one-to-one and need deciding on hardware, not on paper: `eef_pose()`
-needs Pinocchio FK over the URDF, and `move_to(xyz, speed)` needs IK plus a
-bounded joint trajectory — the vendor API is joint-space (`send_pos_vel`),
-while `Driver` is Cartesian.
+### The integration actually used: the LeRobot plugin
+
+`b601/driver/b601.py` wraps `SeeedB601RSFollower` from
+`lerobot-robot-seeed-b601` (PyPI 1.0.0, pure-python wheel; `lerobot>=0.4`,
+`python-can`, `motorbridge`), **unmodified** — no fork. Kinematics live on our
+side via `lerobot.model.kinematics.RobotKinematics` (placo).
+
+Plugin surface: `connect(calibrate=True)`, `get_observation()`,
+`send_action(action)`, `disconnect()`, `is_connected`, `calibrate()`,
+`disable_torque()`, `safe_zero()`. Observations and actions are **flat keys in
+degrees** — `{motor}.pos` / `.vel` / `.torque` — over
+`shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_yaw, wrist_roll,
+gripper`, plus one key per camera. There is no Cartesian anything: a grep of
+the plugin for `kinemat|pinocchio|urdf|cartesian|eef` returns nothing.
+
+**Three behaviours read from its source, each contained in `b601/driver/b601.py`:**
+
+| Behaviour | Why it matters here |
+|---|---|
+| `safe_zero(exit_on_complete=True)` raises `KeyboardInterrupt` **on success** — and True is the default | `SafeDriver` latches on `BaseException`, so the default turns every successful home into a latched fault. We always pass `False` |
+| `disconnect()` calls `safe_zero()` | Disconnecting **moves the arm**. `disable()` maps to `disable_torque()`, never disconnect — the operation you reach for when something is wrong must not command motion |
+| `send_action()` clips to the plugin's own `joint_limits` / `max_relative_target` and logs at `debug` | This repository rejects rather than clamps. Keep the plugin's limits **wider** than `limits.yaml` so ours bind first; then a clip below us is a bug, not a backstop. Open until the limits are measured |
+
+Overheat (>100 °C) also raises `KeyboardInterrupt` from `send_action`. The
+`BaseException` latch handles it; a plain `except Exception` would not.
+
+### Kinematics: URDF, frame, and what is verified
+
+From the vendor's `config/rebotarm_rs.yaml`:
+
+    urdf_path:           urdf/00-arm-rs_asm-v3/urdf/00-arm-rs_asm-v3.urdf
+    end_effector_frame:  gripper_end
+    arm joints:          joint1 .. joint6   (+ prismatic joint_left/joint_right)
+
+`b601/bringup/kinematics_check.py` cross-checks placo against Pinocchio over
+the same URDF. Result on `00-arm-rs_asm-v3`: **max disagreement 0.000000000 m
+over 200 joint vectors.** That validates the frame name, joint ordering and
+units — not the URDF, since both solvers read the same file. Day-3 calibration
+is what validates FK against the arm.
+
+Two things it turned up:
+
+- **FK(zero joints) = (0.30171, 0.0, 0.217747) m.** The scaffold's invented
+  home of `(0.30, 0.00, 0.35)` is **0.1323 m** away, so `safe_home` would have
+  faulted on every successful home. `limits.yaml` now carries the FK-derived
+  value, still pending measurement.
+- **placo resolves `filename="meshes/..."` against the URDF FILE's directory**,
+  but the vendor ships the URDF one level below the meshes. Loading it in
+  place fails with `Mesh meshes/base_link.STL could not be found`. Pinocchio
+  builds the kinematic model without meshes and does not care.
+  `staged_urdf()` stages a copy beside the meshes rather than editing the
+  vendor file.
+
+**The unverified assumption:** that the plugin's motor order corresponds to
+`joint1..joint6`. Nothing enforces it, and a wrong order gives poses that look
+plausible and are wrong everywhere except home. Confirm joint-by-joint on Day 2.
 
 ## Simulation track
 

@@ -19,6 +19,12 @@ motion:
   max_step_distance: 0.15     # m per commanded waypoint
   max_gripper_force: 1.0      # normalised
 home:                 # approved home configuration; safe_home verifies arrival
-  xyz: [0.30, 0.00, 0.35]
+  # FK of the zero joint configuration on the vendor URDF
+  # (00-arm-rs_asm-v3, frame gripper_end), cross-checked placo vs Pinocchio to
+  # machine precision. This is where the plugin's safe_zero() actually lands.
+  # The scaffold previously carried an invented [0.30, 0.00, 0.35], which is
+  # 0.1323 m away — safe_home would have faulted on every successful home.
+  # Still URDF-derived, not measured: Day 2 confirms it against the arm.
+  xyz: [0.30171, 0.0, 0.217747]
   tolerance_m: 0.02   # arrival radius — must exceed measured repeatability,
                       # so Day 2 sets it FROM repeatability.csv, not before

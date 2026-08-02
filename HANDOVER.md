@@ -11,7 +11,7 @@ B601. The learned primitive here is a B601-specific ACT policy trained from
 teleoperated demonstrations.
 
 ## Where things stand
-Day 0-2 software. 231 tests green (`bash b601/setup/setup.sh verify`), no
+Day 0-2 software. 271 tests green (`bash b601/setup/setup.sh verify`), no
 hardware powered, no data collected.
 
 **Before powered motion:** `safe_home()` now guards its endpoints (timeout,

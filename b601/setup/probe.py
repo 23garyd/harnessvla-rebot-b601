@@ -63,6 +63,90 @@ def python_executable(path=None):
     return sys.executable
 
 
+def _git_head(path):
+    """-> (commit, dirty) for the working tree at `path`."""
+    import subprocess
+    path = Path(path)
+    if not path.is_dir():
+        raise ProbeError(f"source directory does not exist: {path}")
+    try:
+        commit = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", str(path), "status", "--porcelain"],
+            capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ProbeError(
+            f"not a git working tree, so nothing identifies its contents: "
+            f"{path}: {exc}") from exc
+    return commit, bool(status)
+
+
+def _find_distribution(name):
+    from importlib.metadata import PackageNotFoundError, distribution
+    try:
+        return distribution(name)
+    except PackageNotFoundError as exc:
+        raise ProbeError(
+            f"distribution {name!r} is not installed for {sys.executable}"
+        ) from exc
+
+
+def distribution_origin(name="lerobot", dist=None, git_head=None, find=None):
+    """Identify the CODEBASE behind an installed distribution, not its version.
+
+    A version string cannot distinguish the Seeed lerobot fork from upstream
+    HuggingFace — the vendor instructions install the fork and warn against
+    upstream, and both report the same `__version__`. An editable install is
+    worse: `git pull` changes behaviour with no version movement at all.
+
+    Returns one of:
+        pypi:<name>:<version>          installed from an index
+        git+<url>@<commit>             installed from a VCS URL (PEP 610)
+        editable+git:<commit>          `pip install -e <dir>`
+        local+git:<commit>             installed from a local directory
+
+    An uncommitted working tree RAISES. Recording "dirty" and later verifying
+    "dirty" compares equal while the contents differ, which is a gate that
+    passes without checking anything.
+    """
+    import json as _json
+    dist = dist if dist is not None else (find or _find_distribution)(name)
+    git_head = git_head or _git_head
+
+    raw = dist.read_text("direct_url.json")
+    if not raw:
+        return f"pypi:{name}:{dist.version}"
+
+    try:
+        info = _json.loads(raw)
+    except ValueError as exc:
+        raise ProbeError(
+            f"{name}: direct_url.json is malformed: {exc}") from exc
+
+    url = info.get("url", "")
+    vcs = info.get("vcs_info")
+    if vcs:
+        commit = vcs.get("commit_id")
+        if not commit:
+            raise ProbeError(
+                f"{name}: installed from {url} with no recorded commit")
+        return f"{vcs.get('vcs', 'vcs')}+{url}@{commit}"
+
+    if not url.startswith("file://"):
+        raise ProbeError(f"{name}: cannot identify origin {url!r}")
+    source = url[len("file://"):]
+    commit, dirty = git_head(source)
+    if dirty:
+        raise ProbeError(
+            f"{name}: the source tree at {source} has uncommitted changes, so "
+            f"no commit identifies what is installed. Commit or stash before "
+            f"recording pins — a dirty tree cannot be pinned.")
+    editable = bool(info.get("dir_info", {}).get("editable"))
+    return f"{'editable' if editable else 'local'}+git:{commit}"
+
+
 def camera_serials(path=None):
     """Sorted, comma-joined camera serials from the camera manifest.
 
@@ -99,6 +183,7 @@ def calibration_sha256(path=None):
 _PROBES = {
     "python-executable": python_executable,
     "lerobot-version": lambda a: lerobot_version(),
+    "lerobot-origin": lambda a: distribution_origin("lerobot"),
     "camera-serials": camera_serials,
     "calibration-sha256": calibration_sha256,
 }

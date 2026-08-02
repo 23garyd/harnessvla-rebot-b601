@@ -17,7 +17,18 @@ pyyaml>=6.0
 # --- data + training (Week 2-3) ---
 # lerobot pinned at bring-up; the sim track learned that a lerobot pin living
 # in a uv-only [tool.uv.sources] table is invisible to pip.
-# lerobot==<pin at Day 2>
+#
+# INSTALL THE SEEED FORK, NOT UPSTREAM HUGGINGFACE. The vendor wiki is
+# explicit about incompatibility, and both report the same __version__ — which
+# is why pin_check.sh gates LEROBOT_ORIGIN (fork URL + commit) and not just
+# the version. Prefer a VCS pin over `pip install -e`: an editable clone is
+# only identified by its git HEAD, and a dirty tree cannot be pinned at all.
+#
+# lerobot[kinematics] @ git+https://github.com/Seeed-Projects/lerobot@<pin at Day 2>
+#   [kinematics] pulls placo>=0.9.6,<0.10.0 — NOT a default dependency, and
+#   now safety-relevant: RobotKinematics is what computes eef_pose(), which
+#   the workspace guard checks against. Pin and gate it like any other.
+# lerobot-robot-seeed-b601==1.0.0   # the B601 plugin; pulls python-can, motorbridge
 # torch==<CUDA build matching sm_120>
 
 # --- perception (Week 1) ---

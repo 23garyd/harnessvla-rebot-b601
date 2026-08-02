@@ -135,3 +135,48 @@ integration wiki. Recorded in `docs/reference_material.md`.
 | Bring-up report, CAN/e-stop/unexpected-motion recovery checklist | Absent |
 | Five-pose repeatability log, evidence video | Harness exists; no data |
 | Mentor sign-off | Unevidenced |
+
+### Day 2 addendum — kinematics, the real driver, and the codebase pin
+
+**FK cross-check first, deliberately.** Before writing anything that depends
+on kinematics, `b601/bringup/kinematics_check.py` solves the same joint
+vectors with placo (what LeRobot's `RobotKinematics` wraps) and with Pinocchio
+(what the vendor examples use), over the vendor URDF `00-arm-rs_asm-v3`, frame
+`gripper_end`. **Max disagreement 0.000000000 m over 200 joint vectors.** That
+validates frame name, joint ordering and units. It does not validate the URDF
+— both read the same file — and the entry in the risk log says so.
+
+It earned its keep immediately:
+
+| Found | Consequence |
+|---|---|
+| **FK(zero joints) = (0.30171, 0.0, 0.217747) m** | The scaffold's invented home `(0.30, 0.00, 0.35)` is **0.1323 m** away, against a 0.02 m arrival radius. `safe_home` would have faulted on **every successful home** the first time it ran on hardware. `limits.yaml` now carries the FK-derived pose, still marked pending measurement |
+| placo resolves mesh paths against the URDF **file**, the vendor ships it one level below `meshes/` | The vendor URDF fails to load in placo as shipped. `staged_urdf()` stages a copy beside the meshes rather than editing vendor files. Pinocchio is unaffected — it builds the model without meshes |
+
+**`b601/driver/b601.py`** wraps `SeeedB601RSFollower` **unmodified** (option D
+of the four evaluated — adapter targeting our `Driver`, not a fork of the
+plugin and not loose scripts). Kinematics on our side via `RobotKinematics`,
+injected so the suite needs neither placo, a URDF, nor CAN. One unit boundary:
+degrees at the vendor edge, radians and metres inside. Three plugin behaviours
+are contained rather than inherited — `safe_zero`'s KeyboardInterrupt-on-
+success, `disconnect()` moving the arm, and `send_action()` clipping where we
+reject. All three are in `docs/reference_material.md` with the source reading.
+
+**`LEROBOT_ORIGIN` is now a gated pin.** The vendor installs a fork and warns
+against upstream; both report the same `__version__`, and an editable clone
+does not move it at all. The probe records `git+<url>@<commit>`,
+`editable+git:<commit>`, `local+git:<commit>` or `pypi:<name>:<version>`, and
+**refuses to record a dirty working tree** — a tree recorded dirty and
+verified dirty compares equal while its contents differ. Checked before the
+version, since the version is meaningless without it.
+
+Impact if it had gone unfixed: not safety, but attribution. Episodes recorded
+under an unidentified lerobot cannot be compared afterwards, and teleop
+episodes are irreplaceable. That is why it lands now rather than before
+evaluation.
+
+40 new tests (231 → 271, 2 skipped — the `--record` end-to-end and the real-
+URDF FK check, both environment-dependent).
+
+**Still not started:** CAN bring-up, measured limits, the twenty-motion run,
+the motor-order confirmation, mentor sign-off. The Day-2 gate is unchanged.

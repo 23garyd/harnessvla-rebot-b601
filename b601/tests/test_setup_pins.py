@@ -109,8 +109,8 @@ def test_python_executable_is_not_resolved_through_symlinks():
 def pins_file(tmp_path, python_executable="/opt/conda/bin/python"):
     """A pins.env recorded under some other interpreter."""
     p = tmp_path / "pins.env"
-    body = f"LEROBOT_VERSION=1.0\nCAMERA_SERIALS=111\n" \
-           f"CALIBRATION_SHA256={'a' * 64}\n"
+    body = f"LEROBOT_VERSION=1.0\nLEROBOT_ORIGIN=pypi:lerobot:1.0\n" \
+           f"CAMERA_SERIALS=111\nCALIBRATION_SHA256={'a' * 64}\n"
     if python_executable is not None:
         body = f"PYTHON_EXECUTABLE={python_executable}\n" + body
     p.write_text(body)
@@ -131,6 +131,19 @@ def test_verify_fails_on_a_pins_file_recorded_before_the_interpreter_pin(tmp_pat
             B601_PINS=str(pins_file(tmp_path, python_executable=None)))
     assert r.returncode == 1
     assert "PYTHON_EXECUTABLE" in r.stderr
+
+
+def test_verify_fails_on_a_pins_file_recorded_before_the_origin_pin(tmp_path):
+    """A version string cannot distinguish the Seeed lerobot fork from
+    upstream. An older pins.env must be re-recorded, not verified against a
+    codebase nothing identifies."""
+    pins = tmp_path / "pins.env"
+    pins.write_text(f"PYTHON_EXECUTABLE={sys.executable}\n"
+                    f"LEROBOT_VERSION=1.0\nCAMERA_SERIALS=111\n"
+                    f"CALIBRATION_SHA256={'a' * 64}\n")
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins))
+    assert r.returncode == 1
+    assert "LEROBOT_ORIGIN" in r.stderr
 
 
 def test_the_interpreter_is_checked_before_the_other_pins(tmp_path):
