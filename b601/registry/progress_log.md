@@ -232,3 +232,49 @@ solver libraries) → **model** (URDF hash, end-effector frame) → **physical**
 value is only meaningful under the earlier ones.
 
 14 new tests (277 → 291).
+
+## Day 3 — review checkpoint, no code changed (2026-08-03)
+
+A review of plan-versus-progress rather than a work day. Recorded because the
+conclusion is about allocation, and allocation decisions are the kind that
+look obvious in hindsight and invisible at the time.
+
+**Verified state at `44aa501`:** 291 tests passing, 2 skipped, clean tree, in
+sync with `garyd/main`.
+
+**Assessment: the method is right; the allocation is no longer.**
+
+What is working: safety before capability, everything exercisable unpowered,
+measured sim findings driving design decisions, and gates recorded as NOT
+EVIDENCED rather than assumed. The review waves earned their cost — latching
+gaps, NaN and negative speeds, joint-state cardinality, a 0.101 m IK residual
+and a 0.1323 m home-pose error would each have surfaced first on powered
+hardware.
+
+What is not: the effort is concentrated in one layer, and that layer is done
+until the arm can answer its remaining questions.
+
+| Package | Plan day | Lines |
+|---|---|---|
+| `b601/safety` + `b601/driver` | 1–2 | 291 tests |
+| `b601/cameras` | 3 | **0** |
+| `b601/primitives` | 4 | **0** |
+| `b601/policy` | 11–14 | **0** |
+| `b601/planner` | 15–17 | **0** |
+
+Two risks logged today: the critical path is hardware and has not started, and
+effort concentrates where tests are easiest to write. A third records the
+parallel-agent merge that reconciled overlapping safety code by hand.
+
+**Recommended order:** record the Day-1 mentor gate; power on, starting with
+the torque-off hand-driven reads (motor order, gripper travel — no commanded
+motion, and they close the most dangerous assumption in the codebase); stop
+hardening the safety layer; use waiting time on the Day-3 camera config and
+sync checker and the Day-4 primitive interfaces, both mock-testable and both
+on the Week-1 gate; close the `agentview` camera-naming decision before any
+recording, since dataset keys are fixed at record time.
+
+**Note for anyone quoting a test count:** an earlier recap circulated citing
+194 tests at merge `736d30f`. That predates the FK cross-check, the B601
+driver adapter, the IK convergence fix and the model pin regime. The current
+figure is 291.
