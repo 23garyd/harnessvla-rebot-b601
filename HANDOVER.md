@@ -25,11 +25,39 @@ in `b601/registry/progress_log.md` for the full remaining list; the largest
 items are `b601/driver/b601.py` against the vendor SDK, measured limits, and
 the twenty-motion repeatability run.
 
+## Machines
+| Machine | Role |
+|---|---|
+| **EPYC + RTX 5090** | Robot PC — CAN, cameras, teleop, recording, training, inference, demo |
+| **ASUS + A6000** | Fallback robot PC until the `sm_120` gate passes; spare capacity after |
+| **Ubuntu + 2× Titan Xp** | Development and CI only — Pascal is on a driver/toolchain support cliff |
+
+Rationale, including why the Titan Xp box is *not* the robot PC, is in
+`b601/registry/protocol_deviations.md`. The 5090 matches the plan's stated
+platform, so this is an allocation record rather than a deviation.
+
+`bash b601/setup/setup.sh env` builds a **test** environment, not a
+robot-ready one: `requirements.txt` leaves the vendor stack as unpinned
+placeholders until it is validated on the robot PC. See the "Before the arm"
+section of `RUNBOOK.md` for the install and the `sm_120` gate that precedes
+CAN bring-up.
+
 ## Read first
 1. `docs/sim_findings_that_transfer.md` — measured results from the sim track
    with their consequences for design here
-2. `b601/registry/risk_log.md` — one risk is **open**: dataset backup target
-3. `b601/safety/limits.py` — the chokepoint everything routes through
+2. `b601/registry/risk_log.md` — open risks, and the control for each
+3. `b601/registry/progress_log.md` — day-by-day, with the defect tables. The
+   commit messages carry the same reasoning if you prefer `git log`
+4. `docs/reference_material.md` — the vendor API as it actually behaves:
+   three plugin hazards, the URDF/frame/joint facts, the FK and IK
+   measurements. Read before touching `b601/driver/b601.py`
+5. `b601/safety/limits.py` and `b601/driver/base.py` — the chokepoint
+   everything routes through, and the section stating what it does **not**
+   cover
+
+Starting a fresh session on the robot PC? Reading those five in order
+reconstructs the current picture; nothing important lives outside the
+repository.
 
 ## Open decisions
 - **Dataset backup target** (needed before the first pilot episode, Day 5)

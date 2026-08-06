@@ -6,3 +6,43 @@ valid state; an undocumented deviation is not.
 | Date | Deviation | Reason | Effect on claims |
 |---|---|---|---|
 | 2026-07-31 | Repo scaffolded as "Day 0", before the plan's Day 1 | Day 1 is charter, concept definition and safety boundary — work that should not compete with directory layout and tooling | None: no hardware powered, no data collected, no experiment version frozen |
+
+## Platform decisions — NOT deviations (2026-08-06)
+
+The plan names "Ubuntu PC with RTX 5090" as the primary platform, and the
+machine chosen matches it. Recorded here anyway because the *rejected*
+alternatives cost real analysis, and without it someone will reasonably
+propose them again in week 3.
+
+| Machine | Role | Why |
+|---|---|---|
+| **EPYC + RTX 5090, 32 GB** | **Robot PC** — CAN, cameras, teleop, recording, ACT training, inference, harness runs, Day-20 demo | Matches the plan. `sm_120` with 32 GB VRAM; EPYC core count helps the one CPU-bound part of training (parallel video decode feeding the GPU). One machine means ONE pin regime, which is what `pin_check.sh` is built to identify |
+| **ASUS + RTX A6000** | **Fallback robot PC** until the `sm_120` check passes; spare training capacity afterwards | `sm_86` is a mature, fully supported target. It is the insurance against Blackwell toolchain immaturity, and must stay available until that check passes |
+| **Ubuntu + 2× Titan Xp** | Development and CI — the unpowered suite, mock-driven primitives/planner work, dataset inspection | See below. Deliberately NOT the robot PC |
+
+**Why not the Titan Xp box, even though it is already wired to the arm.**
+Titan Xp is Pascal (`sm_61`). NVIDIA's R570 driver branch was announced as the
+last supporting Maxwell/Pascal/Volta, which caps the driver, which caps CUDA,
+which caps the usable PyTorch. PyTorch has separately been trimming older
+architectures as it adds Blackwell targets, so `sm_61` may not survive in
+whatever wheel LeRobot resolves to. Compute was never the issue — ~12 TFLOPS
+FP32 against a workload needing a few GFLOPs per chunk is ample — the issue is
+building a 20-day project on a frozen driver branch and a shrinking support
+window when a supported card is available. No tensor cores also forecloses the
+plan's optional SmolVLA stretch goal. (The "NVLink" pair is an SLI bridge;
+Titan Xp has no NVLink, and single-GPU inference would not use it either way.)
+
+**Why training is local, not remote.** ACT is a small policy and the plan's
+Days 11–14 are training days when the arm is idle, so a separate training box
+solves a scheduling problem that does not exist. Splitting would put the
+training environment outside the pin regime and add a dataset transfer step.
+
+**The decision has one open condition.** The 5090 needs a working `sm_120`
+PyTorch for *both* training and inference; if LeRobot's dependency resolution
+pins a torch without those kernels, the robot PC cannot run the policy at all.
+That check is a Day-2 gate in `RUNBOOK.md`, and the A6000 is the named
+fallback. Do not release the A6000 until it passes.
+
+**Unaffected by any of this:** off-machine backup for the demonstration
+episodes is still required before the first pilot (Day 5). A single-machine
+setup does not remove it — an operator session cannot be regenerated.
