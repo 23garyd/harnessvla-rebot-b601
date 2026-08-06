@@ -40,13 +40,15 @@ def valid():
             {"name": "agentview", "serial": "DSJ-250318-J",
              "model": "Microdia DSJ-2062-309", "mount": "fixed",
              "device": "/dev/v4l/by-id/usb-DSJ-250318-J_DSJ-2062-309-video-index0",
-             "format": "MJPG",
-             "width": 640, "height": 480, "fps": 30, "exposure": 156},
+             "format": "MJPG", "backend": "v4l2",
+             "width": 640, "height": 480, "fps": 30,
+             "exposure": 156, "gain": 1},
             {"name": "eye_in_hand", "serial": "353322271941",
              "model": "Intel RealSense D405", "mount": "wrist",
              "device": "353322271941",
-             "format": "rgb8",
-             "width": 640, "height": 480, "fps": 30, "exposure": 8000},
+             "format": "rgb8", "backend": "realsense",
+             "width": 640, "height": 480, "fps": 30,
+             "exposure": 8000, "gain": 16},
         ]
     }
 
@@ -108,7 +110,8 @@ def test_empty_camera_list_raises(tmp_path):
 
 
 @pytest.mark.parametrize("key", ["name", "serial", "model", "mount", "format",
-                                "width", "height", "fps", "exposure"])
+                                "backend", "width", "height", "fps",
+                                "exposure", "gain"])
 def test_missing_required_key_is_rejected(tmp_path, key):
     cfg = valid()
     del cfg["cameras"][0][key]
@@ -211,6 +214,28 @@ def test_automatic_exposure_is_rejected(tmp_path, bad):
     cfg = valid()
     cfg["cameras"][0]["exposure"] = bad
     with pytest.raises(CameraManifestError, match="exposure"):
+        load_cameras(write(tmp_path, cfg))
+
+
+def test_gain_must_be_recorded_too(tmp_path):
+    """Once auto-exposure is off, gain stops adapting and freezes at whatever
+    value auto-exposure happened to leave behind. Unrecorded, that is the same
+    hidden variable as auto-exposure itself: it changes image noise and
+    brightness between sessions and is invisible afterwards."""
+    cfg = valid()
+    cfg["cameras"][0]["gain"] = "auto"
+    with pytest.raises(CameraManifestError, match="gain"):
+        load_cameras(write(tmp_path, cfg))
+
+
+def test_unknown_backend_is_rejected(tmp_path):
+    """The driver stack is recorded, not inferred from the model string. It
+    decides which controls exist and what "auto exposure off" even means — 1
+    (Manual Mode) on V4L2, 0 on RealSense — so guessing it from a product name
+    would silently apply the wrong value to the wrong camera."""
+    cfg = valid()
+    cfg["cameras"][0]["backend"] = "opencv"
+    with pytest.raises(CameraManifestError, match="backend"):
         load_cameras(write(tmp_path, cfg))
 
 

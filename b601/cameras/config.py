@@ -46,7 +46,13 @@ DEFAULT_CAMERAS = Path(__file__).resolve().parents[1] / "setup" / "cameras.json"
 MOUNTS = ("wrist", "fixed")
 
 _REQUIRED = ("name", "serial", "model", "mount", "device", "format",
-             "width", "height", "fps", "exposure")
+             "backend", "width", "height", "fps", "exposure", "gain")
+
+# The driver stack is RECORDED, never inferred from the model string. It decides
+# which controls exist and what "auto exposure off" even means: 1 (Manual Mode)
+# on V4L2, 0 on RealSense. Guessing it from a product name would apply the wrong
+# value to the wrong camera and report success.
+BACKENDS = ("v4l2", "realsense")
 _DIMENSIONS = ("width", "height", "fps")
 
 # JSON carries no comments and `probe.camera_serials` fixed this file's shape on
@@ -70,10 +76,12 @@ class Camera:
     mount: str
     device: str
     format: str
+    backend: str
     width: int
     height: int
     fps: int
     exposure: float
+    gain: float
 
 
 def _text(entry, key, where):
@@ -128,6 +136,25 @@ def _entry(raw, index, where):
             f"{where}: cameras[{index}] mount {mount!r} is not one of "
             f"{list(MOUNTS)}")
 
+    backend = _text(raw, "backend", where)
+    if backend not in BACKENDS:
+        raise CameraManifestError(
+            f"{where}: cameras[{index}] backend {backend!r} is not one of "
+            f"{list(BACKENDS)}")
+
+    # Gain matters for the same reason exposure does, and is easy to miss:
+    # once auto-exposure is off, gain stops adapting and freezes at whatever
+    # value auto-exposure last chose. Unrecorded, it varies image noise and
+    # brightness between sessions and is invisible afterwards.
+    gain = raw["gain"]
+    if isinstance(gain, bool) or not isinstance(gain, (int, float)):
+        raise CameraManifestError(
+            f"{where}: cameras[{index}] gain must be a fixed number, got "
+            f"{gain!r}; automatic gain is not recordable state")
+    if gain <= 0:
+        raise CameraManifestError(
+            f"{where}: cameras[{index}] gain must be positive, got {gain}")
+
     exposure = raw["exposure"]
     # calibration_report.md requires FIXED exposure. Auto-exposure makes
     # ambient light a hidden variable that drifts within a session and across
@@ -152,8 +179,10 @@ def _entry(raw, index, where):
         # MJPG (lossy) and at 25 fps in YUYV (uncompressed). Same camera, same
         # resolution, permanently different image quality in the dataset.
         format=_text(raw, "format", where),
+        backend=backend,
         **{key: _dimension(raw, key, where) for key in _DIMENSIONS},
         exposure=float(exposure),
+        gain=float(gain),
     )
 
 

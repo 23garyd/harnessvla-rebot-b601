@@ -111,17 +111,28 @@ discovered after CAN bring-up and calibration is not.
       **The index-paired offset in the report is a diagnostic, not a fault.**
       The cameras drift 0.28 ms/frame because they are free-running; the
       recorder must pair frames by timestamp, never by frame index.
-- [ ] **Disable auto exposure and auto white balance in the capture path
-      (Day 3, before any recording).** Recording the fixed values in
-      `cameras.json` is not applying them. Both cameras currently run auto
-      exposure and the top camera also runs auto white balance:
+- [x] **Apply the manifest to the cameras — run before EVERY session (Day 3).**
+      Recording the fixed values in `cameras.json` is not applying them. This
+      writes them and reads every one back, because a write to an inactive
+      V4L2 control succeeds and does nothing:
       ```
-      v4l2-ctl -d <by-id path> -c auto_exposure=1                 # Manual Mode FIRST
-      v4l2-ctl -d <by-id path> -c exposure_time_absolute=156      # inactive until the above
-      v4l2-ctl -d <by-id path> -c white_balance_automatic=0
-      # D405: rs.option.enable_auto_exposure=0 then rs.option.exposure on the
-      #       Stereo Module — the D405 has no separate RGB sensor
+      PYTHONNOUSERSITE=1 PYTHONPATH=$PWD \
+        /home/demo/miniforge3/envs/lerobot/bin/python -m b601.cameras.capture
+      #   exit 0 = every recorded setting written AND verified
       ```
+      Run it per session, not once by hand: a replug or a `hardware_reset()`
+      restores defaults. Verified end to end on 2026-08-06 — reset both cameras
+      to auto, applied, confirmed from an independent process.
+      **It does not open a stream**, so it cannot tell you the camera is
+      actually delivering frames. See the next item.
+- [ ] **Confirm frames actually arrive at the start of each episode (Day 3).**
+      Measured: the D405 on its USB 2.1 link stopped delivering frames entirely
+      after several rapid pipeline open/close cycles, while still reporting
+      correct settings — a stalled camera looks healthy to any check that reads
+      configuration rather than frames. Recovery is
+      `rs.context().devices[0].hardware_reset()`, after which frames resumed
+      immediately. Prefer ONE long-lived pipeline across episodes rather than
+      one per episode.
 - [ ] Set `eye_in_hand.exposure` from measurement under workspace lighting, and
       confirm the fingers are resolvable at that exposure (Day 3). The 8000 us
       in the manifest is a placeholder; the camera's own auto-selected 33000 us
