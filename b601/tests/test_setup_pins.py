@@ -50,8 +50,13 @@ def test_camera_manifest_is_anchored_not_cwd_relative(tmp_path, monkeypatch):
     (tmp_path / "cameras.json").write_text(
         json.dumps({"cameras": [{"serial": "DECOY"}]}))
     assert probe.DEFAULT_CAMERAS == REPO / "b601" / "setup" / "cameras.json"
-    with pytest.raises(probe.ProbeError):        # the real anchor has no manifest
-        probe.camera_serials()
+    # Until the Day-3 manifest landed this asserted only that the probe RAISED,
+    # which passed because the real anchor happened to hold no file — an
+    # accidental dependency on absence. Now that the manifest exists the
+    # anchoring can be asserted directly, which is the stronger claim: the
+    # decoy in cwd must not be what gets read.
+    assert "DECOY" not in probe.camera_serials()
+    assert probe.camera_serials() == probe.camera_serials(probe.DEFAULT_CAMERAS)
 
 
 @pytest.mark.parametrize("payload,match", [

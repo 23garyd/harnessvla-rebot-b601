@@ -6,6 +6,8 @@ valid state; an undocumented deviation is not.
 | Date | Deviation | Reason | Effect on claims |
 |---|---|---|---|
 | 2026-07-31 | Repo scaffolded as "Day 0", before the plan's Day 1 | Day 1 is charter, concept definition and safety boundary — work that should not compete with directory layout and tooling | None: no hardware powered, no data collected, no experiment version frozen |
+| 2026-08-06 | Fixed top-view camera is a **Microdia DSJ-2062-309 UVC webcam**, not the planned RealSense D435 | A D435 is not present on this machine. The fixed camera's job is scene localisation for staging and re-grounding, which needs RGB; `calibration_report.md` already permits an image-space staging fallback instead of a camera-to-robot transform | **No depth from above.** Any staging estimate needing depth must come from the D405 or the image-space fallback. Verified working at 640x480 MJPG 30 fps, matching the wrist camera's rate |
+| 2026-08-06 | D405 records **colour only**, no depth stream | The D405 negotiated USB 2.1 (480 Mbps). 640x480 rgb8 at 30 fps is ~221 Mbps; adding depth of the same size roughly doubles it and does not fit in practice. ACT consumes RGB | None for the policy. Removes depth as an input to grasp verification and staging. Reversible by moving the D405 to a USB 3.x cable and port, which is an experiment-version bump once episodes exist |
 
 ## Platform decisions — NOT deviations (2026-08-06)
 

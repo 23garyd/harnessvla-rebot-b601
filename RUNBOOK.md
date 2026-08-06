@@ -86,8 +86,52 @@ discovered after CAN bring-up and calibration is not.
       non-dirty lerobot checkout, and the URDF in place) (Day 2)
 - [ ] Re-record pins after ANY URDF re-export — the model change moves every
       pose the safety layer checks, and is a registry event (Day 2 onward)
-- [ ] Camera start, serial verification, calibration check (Day 3)
-- [ ] `pin_check.sh` — expected output and what a failure means (Day 3)
+- [x] **Camera manifest and serial verification (Day 3).** The manifest is data,
+      validated on load; `probe.camera_serials` reads the same file:
+      ```
+      PYTHONPATH= .venv/bin/python -c "from b601.cameras.config import *; print(load_cameras())"
+      PYTHONPATH= .venv/bin/python -m b601.setup.probe camera-serials
+      #   expect: 353322271941,DSJ-250318-J
+      ```
+      Both cameras must negotiate **640x480 @ 30** — the only mode both reach on
+      their current links. The top camera has no 15 fps MJPG mode, and the D405
+      is on USB 2.1, which fits colour but not colour plus depth. Address the
+      top camera by its `/dev/v4l/by-id/...` path, never `/dev/video0`, which
+      renumbers across reboots.
+- [ ] **Timestamp sync check — run this on every recording session (Day 3).**
+      ```
+      PYTHONPATH= .venv/bin/python -m b601.cameras.sync <timestamps.json>
+      #   exit 0 clean, 1 not. Omit "fps" from the file and it checks against
+      #   the manifest's declared rate rather than one retyped by hand.
+      ```
+      Reference numbers from 2026-08-06, 150 frames per camera: jitter p95
+      3.12 ms (`agentview`) and 0.22 ms (`eye_in_hand`), 0 dropped, 9.04 ms p95
+      pairing gap. **A large `max` jitter with a small p95 is normal** — it is
+      buffered frames flushing at stream start.
+      **The index-paired offset in the report is a diagnostic, not a fault.**
+      The cameras drift 0.28 ms/frame because they are free-running; the
+      recorder must pair frames by timestamp, never by frame index.
+- [ ] **Disable auto exposure and auto white balance in the capture path
+      (Day 3, before any recording).** Recording the fixed values in
+      `cameras.json` is not applying them. Both cameras currently run auto
+      exposure and the top camera also runs auto white balance:
+      ```
+      v4l2-ctl -d <by-id path> -c auto_exposure=1                 # Manual Mode FIRST
+      v4l2-ctl -d <by-id path> -c exposure_time_absolute=156      # inactive until the above
+      v4l2-ctl -d <by-id path> -c white_balance_automatic=0
+      # D405: rs.option.enable_auto_exposure=0 then rs.option.exposure on the
+      #       Stereo Module — the D405 has no separate RGB sensor
+      ```
+- [ ] Set `eye_in_hand.exposure` from measurement under workspace lighting, and
+      confirm the fingers are resolvable at that exposure (Day 3). The 8000 us
+      in the manifest is a placeholder; the camera's own auto-selected 33000 us
+      is a full frame period at 30 fps and would blur every wrist frame.
+- [ ] `pin_check.sh` — expected output and what a failure means (Day 3).
+      **Two blockers today:** `--record` is all-or-nothing and probes the
+      calibration file, which does not exist until calibration is done; and the
+      script hardcodes `.venv/bin/python` while the robot-facing environment is
+      the conda env `lerobot`. Resolve the interpreter question before
+      recording, or episodes cannot be attributed to a configuration.
 - [ ] Workspace reset and object placement (Day 6)
 - [ ] Start a single harness trial (Day 15)
 - [ ] Read the result: where artifacts land, how to tell success from abort (Day 15)

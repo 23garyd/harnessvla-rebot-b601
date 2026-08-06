@@ -278,3 +278,90 @@ recording, since dataset keys are fixed at record time.
 194 tests at merge `736d30f`. That predates the FK cross-check, the B601
 driver adapter, the IK convergence fix and the model pin regime. The current
 figure is 291.
+
+## Day 3 — cameras: manifest, sync checker, and a wrong model caught (2026-08-06)
+
+First day with hardware powered. The arm was brought up, calibrated and
+teleoperated by the operator before this work started; what landed here is the
+camera half of Day 3.
+
+**Environment note that changes the picture.** The robot-facing environment is
+the conda env `lerobot` (`/home/demo/miniforge3/envs/lerobot`), not the repo
+`.venv`. The **`sm_120` gate PASSES there** — torch 2.7.1+cu128, arch list
+includes `sm_120`/`compute_120`, and a real CUDA kernel executes — so the
+platform condition in `protocol_deviations.md` is **met and the A6000 can be
+released**. The same gate FAILS in `.venv`, whose torch is a cu126 build
+topping out at `sm_90`. Two consequences are open, both logged as risks:
+`pin_check.sh` hardcodes `.venv/bin/python` and so cannot pin the environment
+that drives the arm, and **`placo`/`pinocchio` are absent from the conda env**,
+which leaves every Cartesian guard inert there.
+
+**URDF located and hashed.** `2012b5aa3b58…`, matching the value recorded on
+Day 2 — the same kinematic model the earlier FK and home-pose work was measured
+against. Staged as a machine-local symlink; `b601/setup/urdf/` is now gitignored
+on the established rule that the bytes stay out and the hash is committed.
+
+**Camera manifest is now data** (`b601/setup/cameras.json` +
+`b601/cameras/config.py`). `probe.camera_serials` had gated CAMERA_SERIALS since
+Day 0 while reading exactly one field per entry; model, mount, resolution, frame
+rate, pixel format and exposure were documentation. The loader validates all of
+them and refuses a manifest whose cameras disagree on frame rate.
+
+Hardware, measured rather than assumed:
+
+| Camera | Role | Serial | Negotiated |
+|---|---|---|---|
+| Intel RealSense D405 | `eye_in_hand`, wrist | `353322271941` | 640x480 rgb8 @30, **USB 2.1** |
+| Microdia DSJ-2062-309 | `agentview`, fixed top | `DSJ-250318-J` | 640x480 MJPG @30 |
+
+640x480@30 is the only resolution/rate **both** cameras can reach on their
+current links: the top camera has no 15 fps MJPG mode at all, and the D405 is on
+a 480 Mbps link, which fits colour but not colour plus depth. Colour only is not
+a compromise here — ACT consumes RGB and the plan permits an image-space staging
+fallback.
+
+**The sync checker's first model was wrong, and the hardware proved it.**
+`b601/cameras/sync.py` ran against a real 150-frame capture from both cameras:
+
+| Stream | Mean interval | Jitter p95 | Jitter max | Dropped |
+|---|---|---|---|---|
+| `agentview` | 33.02 ms | 3.12 ms | 27.31 ms | 0 |
+| `eye_in_hand` | 33.30 ms | 0.22 ms | 0.42 ms | 0 |
+
+Both within a whisker of 30 fps, both clean — and the checker **failed them**,
+reporting a 76 ms cross-camera offset. Three defects, all in the checker:
+
+| Defect | Why it was wrong |
+|---|---|
+| Paired frame **index** against frame index | The two streams differ by 0.28 ms/frame in rate, so index-paired offset accumulates without bound (76 ms at 150 frames, more in a longer episode). Two USB cameras with no hardware sync always drift. A long episode would have failed however good the cameras were |
+| Bounded jitter on its **max** | The 27.31 ms came entirely from the first two intervals (6.0 and 13.6 ms) — buffered frames flushing at stream start, which every V4L2 capture does. Steady state was 3.12 ms |
+| Paired frames outside the **common window** | Equal frame counts at unequal rates leave the slower stream running past the other's last frame. Those frames have no counterpart because capture stopped, not because the cameras disagreed; they reported a 69.8 ms max gap on a healthy recording |
+
+Corrected: pair by **nearest timestamp**, which is how a recorder assembles an
+observation; bound jitter on p95; exclude and **count** frames outside the common
+window. The same recording then reads 9.04 ms p95 pairing gap — 0.27 of a frame
+period — and passes. The index offset and drift rate are still reported, as
+diagnostics, because they are what say a frame-index recorder would be wrong.
+
+**Requirement this produces for the recording pipeline: pair frames by
+timestamp, never by frame index.** That is not a preference; at 0.28 ms/frame
+the two streams are more than a frame apart by index within 120 frames.
+
+Also found, and not yet fixed: **both cameras are running auto exposure**, and
+the top camera is also running auto white balance. The manifest records fixed
+values and the capture probe proved they can be applied, but nothing in a
+recording path applies them yet.
+
+78 new tests (291 → 369, 2 skipped).
+
+### Day-3 gate: NOT MET
+
+| Requirement | State |
+|---|---|
+| Camera manifest with serials, mounts, modes, fixed exposure | **Landed and validated**, exposure for the wrist still a placeholder |
+| Timestamp-sync checker | **Landed**, and corrected against real capture |
+| Calibration: camera-to-robot transform or documented image-space fallback | Not started |
+| **Measured** reprojection/position error at known table points | Absent — `calibration_report.md` still a template |
+| Landmark stability across a restart | Not tested |
+| `CALIBRATION_SHA256` / `CAMERA_SERIALS` recorded via `pin_check.sh --record` | Blocked: `--record` is all-or-nothing and needs the calibration file |
+| Fixed exposure and white balance actually applied in the capture path | **Not done** |

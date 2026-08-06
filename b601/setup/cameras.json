@@ -1,0 +1,80 @@
+{
+  "_note": [
+    "PROVISIONAL pending the Day-3 capture session. Same status as limits.yaml:",
+    "a change here after the first recorded episode is an experiment-version",
+    "bump (experiment_registry.md) and invalidates the episodes recorded under",
+    "the previous configuration.",
+
+    "MEASURED on epyc 2026-08-06, not chosen: both serials; the top camera's",
+    "available modes (v4l2-ctl --list-formats-ext) and its exposure default of",
+    "156 steps, range 10..626; the D405's advertised colour modes and its USB",
+    "link type, which negotiated 2.1 rather than 3.x.",
+
+    "WHY 640x480 AT 30 FPS. It is the only resolution/rate both cameras can",
+    "reach on their current links. The top camera has NO 15 fps mode in MJPG",
+    "(30 fps only; YUYV at this size caps at 25), and the D405 on USB 2.1",
+    "advertises 640x480 at 30 for colour. Recording two streams at different",
+    "rates would bake a permanent inter-camera ambiguity into every",
+    "observation, which is why load_cameras() refuses it.",
+
+    "WHY COLOUR ONLY FROM THE D405. 640x480 rgb8 at 30 fps is about 221 Mbps;",
+    "adding a depth stream of the same size roughly doubles that and does not",
+    "fit USB 2.1's 480 Mbps in practice. ACT consumes RGB, and",
+    "calibration_report.md permits an image-space staging fallback, so depth is",
+    "not required. If depth is ever wanted, move the D405 to a USB 3.x cable",
+    "and port FIRST, then re-record these pins.",
+
+    "eye_in_hand.exposure IS A PLACEHOLDER, and the one number here most likely",
+    "to be wrong. The D405's own default is 33000 us, which auto-exposure",
+    "selected for ambient light; at 30 fps the frame period is 33333 us, so",
+    "that default exposes for essentially the whole frame and would bake",
+    "maximum motion blur into every frame of a MOVING wrist camera. 8000 us is",
+    "roughly a quarter of the frame period, chosen as a starting point, NOT",
+    "measured. Day 3 sets it under actual workspace lighting.",
+
+    "BOTH CAMERAS CURRENTLY HAVE AUTOMATIC EXPOSURE ENABLED and the top camera",
+    "also has automatic white balance enabled (white_balance_automatic=1,",
+    "auto_exposure=3 Aperture Priority). Recording the fixed values below is",
+    "not the same as applying them: the capture code must explicitly disable",
+    "both autos, or ambient light becomes a hidden variable that drifts across",
+    "sessions and is indistinguishable from policy error afterwards. The top",
+    "camera's exposure_time_absolute reads flags=inactive until auto_exposure",
+    "is set to 1 (Manual Mode).",
+
+    "The D405 exposes only a 'Stereo Module' sensor, no separate RGB sensor —",
+    "its colour stream and its exposure control both live there. Exposure units",
+    "DIFFER between these two cameras: microseconds for the D405, device-defined",
+    "steps for the UVC camera. The values are recorded, never compared.",
+
+    "agentview/eye_in_hand names follow the sim harness idiom deliberately, so",
+    "the released prompt idiom transfers rather than being rewritten. This was",
+    "the open decision in HANDOVER.md; it is free to change until the first",
+    "episode is recorded and expensive afterwards."
+  ],
+  "cameras": [
+    {
+      "name": "agentview",
+      "serial": "DSJ-250318-J",
+      "model": "Microdia DSJ-2062-309",
+      "mount": "fixed",
+      "device": "/dev/v4l/by-id/usb-DSJ-250318-J_DSJ-2062-309-video-index0",
+      "format": "MJPG",
+      "width": 640,
+      "height": 480,
+      "fps": 30,
+      "exposure": 156
+    },
+    {
+      "name": "eye_in_hand",
+      "serial": "353322271941",
+      "model": "Intel RealSense D405",
+      "mount": "wrist",
+      "device": "353322271941",
+      "format": "rgb8",
+      "width": 640,
+      "height": 480,
+      "fps": 30,
+      "exposure": 8000
+    }
+  ]
+}
