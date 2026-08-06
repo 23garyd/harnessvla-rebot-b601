@@ -11,6 +11,12 @@ __pycache__/
 .worktrees/
 .superpowers/
 
+# Vendor kinematic model. Same rule as above: the bytes stay out, the HASH is
+# committed (URDF_SHA256 in b601/setup/pins.env). This path is a machine-local
+# symlink into the vendor checkout — committing it would point every other
+# machine, including the A6000 fallback, at a directory that does not exist.
+b601/setup/urdf/
+
 !datasets/README.md
 !checkpoints/README.md
 !artifacts/README.md
