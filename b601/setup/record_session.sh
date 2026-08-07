@@ -58,6 +58,20 @@ touch "$BACKUP/.write_test" 2>/dev/null || fail "backup directory is not writabl
 rm -f "$BACKUP/.write_test"
 echo "  $BACKUP is writable ($(df -h "$BACKUP" | awk 'NR==2{print $4}') free)"
 
+# A run that aborted after LeRobotDataset.create() leaves a skeleton behind,
+# and create() uses mkdir(exist_ok=False), so the next attempt dies with a bare
+# FileExistsError. Clear the skeleton, but NEVER anything holding episodes: a
+# teleop session cannot be regenerated, and an accidental clobber here is the
+# single most expensive mistake available in this project.
+if [ -d "$DATASET_ROOT" ]; then
+    EXISTING="$(find "$DATASET_ROOT" \( -name '*.parquet' -o -name '*.mp4' \) 2>/dev/null | head -1)"
+    if [ -n "$EXISTING" ]; then
+        fail "$DATASET_ROOT already holds recorded episodes (e.g. $EXISTING). Refusing to touch it — set B601_DATASET_ID to a new name, or move the existing dataset aside deliberately"
+    fi
+    echo "  clearing an empty dataset skeleton from an aborted run (no episode data present)"
+    rm -rf "$DATASET_ROOT"
+fi
+
 CAMERAS="$(run_py -m b601.cameras.lerobot_config)" || fail "could not derive the camera argument from cameras.json"
 echo
 echo "=== recording ==="
