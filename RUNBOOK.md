@@ -133,6 +133,26 @@ discovered after CAN bring-up and calibration is not.
       `rs.context().devices[0].hardware_reset()`, after which frames resumed
       immediately. Prefer ONE long-lived pipeline across episodes rather than
       one per episode.
+- [ ] **Mount drift check — run at the START of every session (Day 3).**
+      Not a calibration: it detects that a mount MOVED, which is the failure
+      that silently biases every episode recorded afterwards.
+      ```
+      # once, with the cameras in their FINAL position and ArUco markers placed:
+      PYTHONNOUSERSITE=1 PYTHONPATH=$PWD \
+        /home/demo/miniforge3/envs/lerobot/bin/python -m b601.cameras.reference --record
+      # thereafter, before recording anything:
+      PYTHONNOUSERSITE=1 PYTHONPATH=$PWD \
+        /home/demo/miniforge3/envs/lerobot/bin/python -m b601.cameras.reference
+      #   exit 0 clean, 1 if a mount moved
+      ```
+      Markers must be `DICT_4X4_50`, fixed to the same structure as the
+      workspace, and OUTSIDE the area objects move through — the check cannot
+      tell a moved camera from a moved marker.
+      `eye_in_hand` reports **NOT CHECKED** and that is correct: a wrist
+      camera's landmarks move with the arm, so its reference needs a repeatable
+      arm pose that does not exist until `safe_home` is trusted.
+      Re-recording redefines "not drifted" — registry event, and
+      `CALIBRATION_SHA256` must be re-recorded with it.
 - [ ] Set `eye_in_hand.exposure` from measurement under workspace lighting, and
       confirm the fingers are resolvable at that exposure (Day 3). The 8000 us
       in the manifest is a placeholder; the camera's own auto-selected 33000 us
