@@ -71,13 +71,16 @@ class LinkReport:
         head = "LINK OK" if self.passed else "LINK BAD"
         line = f"  {head:<10} {self.name:<14} USB {shown}"
         if not self.passed:
-            line += ("\n    FAIL: a RealSense needs USB 3.x. MEASURED: LeRobot's "
-                     "threaded manager returned 0/15 frames on a USB 2.1 link "
-                     "while raw pyrealsense2 returned 10/10 on the same camera "
-                     "seconds earlier — so a raw-API liveness check PASSES a "
-                     "camera lerobot-record cannot read at all. Move it to a "
-                     "USB 3 port AND check the cable: many USB-C cables are "
-                     "USB 2.0 only")
+            line += ("\n    FAIL: a RealSense needs USB 3.x for headroom — "
+                     "LeRobot itself warns 'Detected USB 2.1. Color/depth "
+                     "streaming may stall', and the colour-only deviation in "
+                     "the registry exists because depth+colour does not fit "
+                     "in USB 2 bandwidth. Move it to a USB 3 port AND check "
+                     "the cable: many USB-C cables are USB 2.0 only. (The "
+                     "0-frame recording failure once blamed on this link was "
+                     "actually two other defects — the vendor null-frame bug "
+                     "and the D405's one-session-per-reset behaviour; see "
+                     "risk_log.md)")
         return line
 
 

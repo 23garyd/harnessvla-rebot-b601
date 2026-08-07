@@ -124,15 +124,18 @@ def test_no_liveness_reports_at_all_fails_rather_than_passing_vacuously():
 # --- USB link type: fatal for RealSense, and preflight could not see it ---
 
 def test_a_realsense_on_usb2_fails_the_link_check():
-    """MEASURED, and it cost a recording session. LeRobot's threaded RealSense
-    manager returned 0/15 frames on a USB 2.1 link while raw pyrealsense2
-    returned 10/10 on the same camera seconds earlier — so preflight, which
-    used the raw API, passed a camera that lerobot-record then could not read
-    at all. LeRobot itself warns 'Detected USB 2.1. Color/depth streaming may
-    stall.' and then times out.
-
-    Preflight has to fail on the link type rather than discover it when the
-    operator is already standing at the leader arm."""
+    """The link gate stays, but for the RIGHT reason now: bandwidth. LeRobot
+    warns 'Detected USB 2.1. Color/depth streaming may stall.', and the
+    colour-only registry deviation exists because depth+colour does not fit
+    USB 2. The 0-frame recording failure this check was WRITTEN for turned
+    out to be two other defects entirely — measured later on a USB 3.2 link:
+    (1) the vendor wrapper's null-frame bug (fixed, vendor commit 3b4f877)
+    made every colour-only session deliver nothing, and (2) the D405 on
+    firmware 5.12.14.100 streams exactly one pipeline session per hardware
+    reset, so preflight's own grab was killing the recording that followed
+    (handled by b601.cameras.reset in the session script). A check whose
+    failure story is wrong teaches the wrong remedy, so this docstring is the
+    correction."""
     from b601.cameras.preflight import check_usb_link
     r = check_usb_link("eye_in_hand", "2.1")
     assert not r.passed

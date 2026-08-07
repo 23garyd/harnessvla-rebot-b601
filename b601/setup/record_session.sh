@@ -13,8 +13,21 @@
 #                     LeRobot's camera configs carry no exposure field, so
 #                     without this the session records under auto exposure no
 #                     matter what cameras.json says
+#   2a. reset         MEASURED: the D405 (fw 5.12.14.100) streams exactly ONE
+#                     pipeline session per hardware reset, so every consumer
+#                     of a session gets a reset immediately before it.
+#                     Preflight gets one (whatever ran earlier in the day left
+#                     the camera dead), and lerobot-record gets one (preflight
+#                     itself consumed a session — which is precisely how
+#                     recording attempt 4 timed out on a camera preflight had
+#                     just passed)
 #   3. preflight      cameras are alive, in sync, and no mount has drifted
-#   4. backup check   the destination exists and is writable BEFORE recording,
+#   4. reset+capture  the record process's own fresh session — and the reset
+#                     wipes the sensor options, so capture runs again.
+#                     (Options set without a pipeline do not consume the
+#                     session and persist into the next one; measured, see
+#                     b601/cameras/reset.py)
+#   5. backup check   the destination exists and is writable BEFORE recording,
 #                     not after
 #
 # The camera argument is DERIVED from cameras.json rather than typed here, so
@@ -40,19 +53,27 @@ DATASET_ROOT="${B601_DATASET_ROOT:-$REPO/datasets/$DATASET_ID}"
 fail() { echo "GATE FAILED: $*" >&2; exit 1; }
 run_py() { PYTHONNOUSERSITE=1 PYTHONPATH="$REPO" "$CONDA_PY" "$@"; }
 
-echo "=== 1/4  experiment identity (pin_check) ==="
+echo "=== 1/5  experiment identity (pin_check) ==="
 B601_PY="$CONDA_PY" bash "$REPO/b601/setup/pin_check.sh" \
     || fail "pins do not verify. Recording now would produce episodes that cannot be attributed to a configuration — the whole point of the regime. Re-record pins ONLY if the change was deliberate, with an experiment-registry entry"
 
-echo "=== 2/4  apply the manifest to the cameras ==="
+echo "=== 2/5  fresh D405 session, then the manifest onto the cameras ==="
+run_py -m b601.cameras.reset \
+    || fail "the D405 did not come back from its hardware reset — see the one-session-per-reset entry in risk_log.md"
 run_py -m b601.cameras.capture \
     || fail "cameras could not be configured as cameras.json describes"
 
-echo "=== 3/4  preflight (liveness, sync, mount drift) ==="
+echo "=== 3/5  preflight (liveness, sync, mount drift) ==="
 run_py -m b601.cameras.preflight \
     || fail "preflight. Do not record until this passes"
 
-echo "=== 4/4  backup destination ==="
+echo "=== 4/5  hand lerobot-record a FRESH D405 session ==="
+run_py -m b601.cameras.reset \
+    || fail "the D405 did not come back from its hardware reset. lerobot-record would open the dead post-preflight session and time out with zero frames"
+run_py -m b601.cameras.capture \
+    || fail "re-applying the manifest after the reset failed — the reset wiped the sensor options, so recording now would run under auto exposure"
+
+echo "=== 5/5  backup destination ==="
 [ -d "$BACKUP" ] || fail "backup directory missing: $BACKUP"
 touch "$BACKUP/.write_test" 2>/dev/null || fail "backup directory is not writable: $BACKUP — a teleop session cannot be regenerated, so this is checked BEFORE recording"
 rm -f "$BACKUP/.write_test"

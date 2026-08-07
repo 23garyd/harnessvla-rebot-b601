@@ -145,14 +145,26 @@ discovered after CAN bring-up and calibration is not.
       to auto, applied, confirmed from an independent process.
       **It does not open a stream**, so it cannot tell you the camera is
       actually delivering frames. See the next item.
-- [ ] **Confirm frames actually arrive at the start of each episode (Day 3).**
-      Measured: the D405 on its USB 2.1 link stopped delivering frames entirely
-      after several rapid pipeline open/close cycles, while still reporting
-      correct settings — a stalled camera looks healthy to any check that reads
-      configuration rather than frames. Recovery is
-      `rs.context().devices[0].hardware_reset()`, after which frames resumed
-      immediately. Prefer ONE long-lived pipeline across episodes rather than
-      one per episode.
+- [x] **The D405 streams exactly ONE pipeline session per hardware reset.**
+      Root-caused 2026-08-07 (fw 5.12.14.100, on USB 3.2, raw pyrealsense2 —
+      no LeRobot code involved): after a reset the first pipeline session
+      delivers every frame; the second and every later one opens fine,
+      negotiates the right profile, and delivers **nothing**, no matter how
+      long you wait. This is why a passing check can kill the recording that
+      follows it. Every consumer of a session must be preceded by
+      ```
+      PYTHONNOUSERSITE=1 PYTHONPATH=$PWD \
+        /home/demo/miniforge3/envs/lerobot/bin/python -m b601.cameras.reset
+      ```
+      followed by `-m b601.cameras.capture`, because the reset restores auto
+      exposure. `record_session.sh` does both, twice (before preflight, and
+      again before `lerobot-record`). Setting options WITHOUT a pipeline does
+      not consume the session. If you ran ANY camera check by hand, the D405
+      is dead until the next reset — that is normal, not a fault. Candidate
+      real fix: a firmware update (owner decision, see risk_log.md).
+      Separately: the vendor wrapper's colour-only path delivered zero frames
+      even on a good session until vendor commit `3b4f877` (null-frame check
+      used `is not None`; null frames are falsy, never None).
 - [ ] **Mount drift check — run at the START of every session (Day 3).**
       Not a calibration: it detects that a mount MOVED, which is the failure
       that silently biases every episode recorded afterwards.
