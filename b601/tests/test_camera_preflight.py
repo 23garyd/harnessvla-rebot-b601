@@ -119,3 +119,50 @@ def test_no_liveness_reports_at_all_fails_rather_than_passing_vacuously():
     ok, text = summarise([], FakeSync(), [FakeDrift()], ())
     assert not ok
     assert "no cameras" in text.lower()
+
+
+# --- USB link type: fatal for RealSense, and preflight could not see it ---
+
+def test_a_realsense_on_usb2_fails_the_link_check():
+    """MEASURED, and it cost a recording session. LeRobot's threaded RealSense
+    manager returned 0/15 frames on a USB 2.1 link while raw pyrealsense2
+    returned 10/10 on the same camera seconds earlier — so preflight, which
+    used the raw API, passed a camera that lerobot-record then could not read
+    at all. LeRobot itself warns 'Detected USB 2.1. Color/depth streaming may
+    stall.' and then times out.
+
+    Preflight has to fail on the link type rather than discover it when the
+    operator is already standing at the leader arm."""
+    from b601.cameras.preflight import check_usb_link
+    r = check_usb_link("eye_in_hand", "2.1")
+    assert not r.passed
+    assert "2.1" in r.summary() and "USB 3" in r.summary()
+
+
+@pytest.mark.parametrize("descriptor", ["3.0", "3.1", "3.2"])
+def test_usb3_passes(descriptor):
+    from b601.cameras.preflight import check_usb_link
+    assert check_usb_link("eye_in_hand", descriptor).passed
+
+
+def test_an_unknown_link_descriptor_fails_rather_than_being_assumed_fine():
+    """If the descriptor cannot be read, the link is unverified. Recording on
+    an unverified link is what just failed."""
+    from b601.cameras.preflight import check_usb_link
+    assert not check_usb_link("eye_in_hand", None).passed
+    assert not check_usb_link("eye_in_hand", "").passed
+
+
+def test_the_link_check_fails_the_whole_preflight():
+    from b601.cameras.preflight import check_usb_link, summarise
+    ok, text = summarise([live()], FakeSync(), [FakeDrift()], (),
+                         links=[check_usb_link("eye_in_hand", "2.1")])
+    assert not ok
+    assert "USB" in text
+
+
+def test_link_reports_appear_even_when_they_pass():
+    from b601.cameras.preflight import check_usb_link, summarise
+    _, text = summarise([live()], FakeSync(), [FakeDrift()], (),
+                        links=[check_usb_link("eye_in_hand", "3.2")])
+    assert "3.2" in text

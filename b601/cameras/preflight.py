@@ -57,6 +57,39 @@ class LivenessReport:
         return line
 
 
+@dataclass(frozen=True)
+class LinkReport:
+    name: str
+    descriptor: object          # None when it could not be read
+
+    @property
+    def passed(self):
+        return bool(self.descriptor) and str(self.descriptor).startswith("3")
+
+    def summary(self):
+        shown = self.descriptor if self.descriptor else "unknown"
+        head = "LINK OK" if self.passed else "LINK BAD"
+        line = f"  {head:<10} {self.name:<14} USB {shown}"
+        if not self.passed:
+            line += ("\n    FAIL: a RealSense needs USB 3.x. MEASURED: LeRobot's "
+                     "threaded manager returned 0/15 frames on a USB 2.1 link "
+                     "while raw pyrealsense2 returned 10/10 on the same camera "
+                     "seconds earlier — so a raw-API liveness check PASSES a "
+                     "camera lerobot-record cannot read at all. Move it to a "
+                     "USB 3 port AND check the cable: many USB-C cables are "
+                     "USB 2.0 only")
+        return line
+
+
+def check_usb_link(name, descriptor):
+    """-> LinkReport. `descriptor` is librealsense's usb_type_descriptor.
+
+    Unreadable counts as FAILED, not as fine: recording on an unverified link
+    is exactly what failed.
+    """
+    return LinkReport(name=name, descriptor=descriptor)
+
+
 def check_liveness(name, requested, received, timed_out):
     """-> LivenessReport. Pure; the grabbing lives in `main`."""
     if requested < 1:
@@ -68,7 +101,7 @@ def check_liveness(name, requested, received, timed_out):
                           received=int(received), timed_out=bool(timed_out))
 
 
-def summarise(liveness, sync_report, drift_reports, unchecked):
+def summarise(liveness, sync_report, drift_reports, unchecked, links=()):
     """-> (ok, text) aggregating every section into one verdict.
 
     Every section is printed even when it passed: a gate that prints nothing on
@@ -76,6 +109,12 @@ def summarise(liveness, sync_report, drift_reports, unchecked):
     failure looks like the tool being broken.
     """
     lines, ok = [], True
+
+    if links:
+        lines.append("links:")
+        for report in links:
+            lines.append(report.summary())
+            ok = ok and report.passed
 
     lines.append("frames:")
     if not liveness:
@@ -171,6 +210,20 @@ def main(argv=None):
     for t in threads:
         t.join(timeout=120)
 
+    links = []
+    for camera in cameras:
+        if camera.backend != "realsense":
+            continue
+        try:
+            import pyrealsense2 as rs
+            found = [d for d in rs.context().devices
+                     if d.get_info(rs.camera_info.serial_number) == camera.serial]
+            descriptor = (found[0].get_info(rs.camera_info.usb_type_descriptor)
+                          if found else None)
+        except Exception:
+            descriptor = None
+        links.append(check_usb_link(camera.name, descriptor))
+
     liveness, stamps, landmarks = [], {}, {}
     for camera in cameras:
         received, timed_out, ts, frame = results.get(
@@ -183,7 +236,7 @@ def main(argv=None):
             landmarks[camera.name] = detect_landmarks(frame)
 
     if not stamps:
-        ok, text = summarise(liveness, _NoSync(), [], ())
+        ok, text = summarise(liveness, _NoSync(), [], (), links=links)
         print(text)
         return 1
 
@@ -194,7 +247,8 @@ def main(argv=None):
         drift_reports, unchecked = [], tuple(sorted(landmarks))
         print(f"  drift reference unavailable: {exc}", file=sys.stderr)
 
-    ok, text = summarise(liveness, sync_report, drift_reports, unchecked)
+    ok, text = summarise(liveness, sync_report, drift_reports, unchecked,
+                         links=links)
     print(text)
     return 0 if ok else 1
 
