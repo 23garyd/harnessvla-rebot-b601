@@ -57,6 +57,13 @@ def cameras_arg(cameras):
             "fps": camera.fps,
         }
         if kind == "opencv":
+            # The pixel format is NOT optional. Measured on this camera: MJPG
+            # offers 640x480 at 30 fps, YUYV caps at 25. Omitting it let OpenCV
+            # negotiate the default (YUYV) and lerobot-record aborted with
+            # "failed to set fps=30 (actual_fps=25.0)". It is also record-time
+            # state in its own right -- same camera, same resolution,
+            # permanently different image quality.
+            config["fourcc"] = camera.format
             # index_or_path, never an index. /dev/videoN renumbers across
             # replugs and demonstrably did on this machine: the D405 and the
             # webcam swapped ranges twice in one day.
@@ -65,6 +72,9 @@ def cameras_arg(cameras):
             # By serial, because the D405's by-id path is not stable either —
             # it presents a different USB descriptor on USB 2 than on USB 3.
             config["serial_number_or_name"] = camera.serial
+            # rgb8 is the default here, which is exactly why leaving it out
+            # would have gone unnoticed rather than failing loudly.
+            config["color_stream_format"] = camera.format
         out[camera.name] = config
     return out
 

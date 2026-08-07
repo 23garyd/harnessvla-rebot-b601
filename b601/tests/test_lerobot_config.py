@@ -76,3 +76,43 @@ def test_the_json_round_trips_through_the_shell_argument():
     import json
     arg = cameras_arg(load_cameras())
     assert json.loads(json.dumps(arg)) == arg
+
+
+# --- the pixel format must survive the derivation -------------------------
+
+def test_the_manifest_format_becomes_the_opencv_fourcc():
+    """FOUND ON HARDWARE, and it was a straight omission on my part.
+
+    Without fourcc, OpenCV negotiates the camera's default — YUYV — and this
+    camera caps at 25 fps in YUYV at 640x480 while offering 30 only in MJPG.
+    lerobot-record then aborted with 'failed to set fps=30 (actual_fps=25.0)'.
+
+    The manifest has recorded `format` from the start precisely because it is
+    record-time state: same camera, same resolution, permanently different
+    image quality and frame rate. Deriving the config and then dropping that
+    field recreated exactly the drift the derivation exists to prevent."""
+    cam = cameras_arg(load_cameras())["agentview"]
+    assert cam["fourcc"] == "MJPG"
+
+
+def test_the_realsense_colour_stream_format_is_carried_too():
+    """Same reasoning; rgb8 happens to be the default, which is why an
+    omission here would have gone unnoticed rather than failing loudly."""
+    cam = cameras_arg(load_cameras())["eye_in_hand"]
+    assert cam["color_stream_format"] == "rgb8"
+
+
+def test_a_format_change_in_the_manifest_reaches_the_argument(tmp_path):
+    import json
+    from pathlib import Path
+    from b601.cameras.config import load_cameras as load
+    raw = json.loads(Path("b601/setup/cameras.json").read_text())
+    for entry in raw["cameras"]:
+        if entry["backend"] == "v4l2":
+            entry["format"] = "YUYV"
+            entry["fps"] = 25
+        else:
+            entry["fps"] = 25
+    p = tmp_path / "cameras.json"
+    p.write_text(json.dumps(raw))
+    assert cameras_arg(load(p))["agentview"]["fourcc"] == "YUYV"
