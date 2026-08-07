@@ -151,6 +151,11 @@ class ReferenceSet:
     dictionary: str
     tolerance_px: float
     cameras: dict          # name -> {landmark id: (x, y)}
+    # orb_homography only: name -> {"file", "sha256"}. The reference IMAGE is
+    # what features are matched against, so its hash belongs in the artifact
+    # that CALIBRATION_SHA256 pins -- otherwise the image could be swapped
+    # under a pinned json and the check would silently mean something else.
+    images: dict = None
 
     def write(self, path):
         path = Path(path)
@@ -171,6 +176,8 @@ class ReferenceSet:
                 for name, marks in sorted(self.cameras.items())
             },
         }
+        if self.images:
+            payload["images"] = {k: dict(v) for k, v in sorted(self.images.items())}
         path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
@@ -211,10 +218,14 @@ def load_reference(path=None):
             out[i] = (x, y)
         parsed[name] = out
 
+    images = raw.get("images") or {}
+    if not isinstance(images, dict):
+        raise DriftError(f"{path}: 'images' must be a mapping")
     return ReferenceSet(method=str(raw.get("method", "")),
                         dictionary=str(raw.get("dictionary", "")),
                         tolerance_px=float(tolerance),
-                        cameras=parsed)
+                        cameras=parsed,
+                        images={k: dict(v) for k, v in images.items()})
 
 
 def check_all(reference, detected):
@@ -239,6 +250,67 @@ def check_all(reference, detected):
                                          reference.tolerance_px))
     unchecked = tuple(sorted(n for n in detected if n not in reference.cameras))
     return reports, unchecked
+
+
+
+# --- marker-free drift: homography over natural scene features -------------
+#
+# Measured on this workspace 2026-08-06: 1512 ORB features in the periphery,
+# 609 of them strong. Markers are not required HERE because the scene carries
+# enough texture on its own. Rather than invent a second verdict, the estimated
+# homography is applied to a fixed grid of probe points and the displacement of
+# THOSE is the drift — so both methods run through the same compare_landmarks.
+
+# Fractions of the frame excluded from feature matching: objects move through
+# the middle every episode, so only the border is a stable landmark region.
+WORKSPACE_MASK = (0.20, 0.85, 0.15, 0.85)      # top, bottom, left, right
+MIN_MATCH_INLIERS = 25
+
+
+def probe_grid(width, height, divisions=4):
+    """-> {i: (x, y)} a deterministic grid of points spanning the frame.
+
+    These are not features. They are fixed places whose movement UNDER the
+    estimated homography is what gets measured, which keeps the units (pixels
+    of displacement) and the verdict identical to the ArUco path. Spanning the
+    frame matters: a rotation or a tilt barely moves the centre and moves the
+    corners a lot.
+    """
+    points, i = {}, 0
+    for row in range(1, divisions):
+        for col in range(1, divisions):
+            points[i] = (width * col / divisions, height * row / divisions)
+            i += 1
+    return points
+
+
+def homography_landmarks(points, homography):
+    """-> {i: (x, y)} for `points` mapped through a 3x3 `homography`.
+
+    A homography cv2 could not estimate comes back as None. Treating that as
+    "nothing moved" would be a check that passes precisely when it failed.
+    """
+    if homography is None:
+        raise DriftError(
+            "no homography could be estimated between the reference frame and "
+            "the current one, so drift was NOT measured — too few matching "
+            "features, or the scene changed beyond recognition")
+    rows = [tuple(float(v) for v in row) for row in homography]
+    if len(rows) != 3 or any(len(r) != 3 for r in rows):
+        raise DriftError(f"homography must be 3x3, got {homography!r}")
+
+    out = {}
+    for i, (x, y) in points.items():
+        w = rows[2][0] * x + rows[2][1] * y + rows[2][2]
+        if abs(w) < 1e-12:
+            raise DriftError(
+                f"degenerate homography: probe point {i} maps to infinity, so "
+                f"the estimate is unusable rather than merely large")
+        # The third row is not decorative: without the division a camera that
+        # TILTED rather than slid would under-report its drift.
+        out[i] = ((rows[0][0] * x + rows[0][1] * y + rows[0][2]) / w,
+                  (rows[1][0] * x + rows[1][1] * y + rows[1][2]) / w)
+    return out
 
 
 # --- detection ------------------------------------------------------------
@@ -270,8 +342,53 @@ def detect_landmarks(frame, dictionary="DICT_4X4_50"):
     return found
 
 
-def grab_landmarks(cameras, dictionary="DICT_4X4_50"):
-    """-> {camera name: {id: (x, y)}} by opening each camera for one frame.
+def estimate_homography(reference_gray, current_gray):
+    """-> 3x3 homography mapping reference pixels to current ones.
+
+    ORB features restricted to the frame periphery, matched with a ratio test,
+    then RANSAC. RANSAC is what makes this usable without markers: a cable or a
+    tool moved in the periphery produces outlier matches, and only a COHERENT
+    shift across many features survives to move the estimate.
+    """
+    import cv2
+    import numpy as np
+
+    h, w = reference_gray.shape[:2]
+    top, bottom, left, right = WORKSPACE_MASK
+    mask = np.full((h, w), 255, np.uint8)
+    mask[int(h * top):int(h * bottom), int(w * left):int(w * right)] = 0
+
+    orb = cv2.ORB_create(nfeatures=2000)
+    kp_ref, des_ref = orb.detectAndCompute(reference_gray, mask)
+    kp_cur, des_cur = orb.detectAndCompute(current_gray, mask)
+    if des_ref is None or des_cur is None or len(kp_ref) < MIN_MATCH_INLIERS:
+        raise DriftError(
+            f"too few features to compare: {0 if des_ref is None else len(kp_ref)} "
+            f"in the reference, {0 if des_cur is None else len(kp_cur)} now. "
+            f"The periphery may lack texture, or the view changed entirely")
+
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+    pairs = matcher.knnMatch(des_ref, des_cur, k=2)
+    good = [m for m, n in (p for p in pairs if len(p) == 2)
+            if m.distance < 0.75 * n.distance]
+    if len(good) < MIN_MATCH_INLIERS:
+        raise DriftError(
+            f"only {len(good)} good feature matches (need "
+            f"{MIN_MATCH_INLIERS}); drift was NOT measured")
+
+    src = np.float32([kp_ref[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+    dst = np.float32([kp_cur[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+    H, inliers = cv2.findHomography(src, dst, cv2.RANSAC, 3.0)
+    if H is None or inliers is None or int(inliers.sum()) < MIN_MATCH_INLIERS:
+        raise DriftError(
+            f"homography rejected: {0 if inliers is None else int(inliers.sum())} "
+            f"RANSAC inliers of {len(good)} matches (need "
+            f"{MIN_MATCH_INLIERS})")
+    return tuple(tuple(float(v) for v in row) for row in H)
+
+
+def grab_frames(cameras):
+    """-> {camera name: BGR frame} by opening each camera for one frame.
 
     Applies the manifest's settings first: comparing a reference taken under
     fixed exposure against a frame taken under auto exposure would measure the
@@ -319,15 +436,64 @@ def grab_landmarks(cameras, dictionary="DICT_4X4_50"):
                     raise DriftError(f"{camera.name}: no frame delivered")
             finally:
                 cap.release()
-        found[camera.name] = detect_landmarks(frame, dictionary)
+        found[camera.name] = frame
     return found
 
 
+ARUCO_METHOD = "aruco_landmarks"
+ORB_METHOD = "orb_homography"
 DEFAULT_TOLERANCE_PX = 3.0
 DEFAULT_DICTIONARY = "DICT_4X4_50"
 
 
-def main(argv=None, grab=grab_landmarks, path=None):
+def _sha256(path):
+    import hashlib
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def current_landmarks(reference, frames, path, detect=None):
+    """-> {name: {id: (x, y)}} for the CURRENT frames, by the stored method.
+
+    ArUco: detect the markers. ORB: match against the stored reference image
+    and push the probe grid through the resulting homography. Either way the
+    output is landmark positions, so the verdict is the same code.
+    """
+    detect = detect or detect_landmarks
+    base = Path(path).parent
+    out = {}
+    for name, frame in frames.items():
+        if reference.method == ORB_METHOD:
+            if name not in reference.images:
+                # No reference for it (a wrist camera). Carry it through as
+                # empty so check_all reports it NOT CHECKED: dropping it here
+                # would make it vanish from the report entirely, which reads
+                # as "everything was checked".
+                out[name] = {}
+                continue
+            record = reference.images[name]
+            image_path = base / record["file"]
+            if not image_path.is_file():
+                raise DriftError(
+                    f"{name}: reference image {image_path} is missing, so "
+                    f"drift cannot be measured")
+            if _sha256(image_path) != record.get("sha256"):
+                # The pinned json vouches for this hash; a changed image under
+                # it would silently redefine what "not drifted" means.
+                raise DriftError(
+                    f"{name}: reference image {image_path} does not match the "
+                    f"hash recorded in the calibration artifact")
+            import cv2
+            ref_gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+            cur_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            H = estimate_homography(ref_gray, cur_gray)
+            out[name] = homography_landmarks(reference.cameras[name], H)
+        else:
+            out[name] = detect(frame, reference.dictionary
+                               or DEFAULT_DICTIONARY)
+    return out
+
+
+def main(argv=None, grab=grab_frames, path=None, detect=None):
     """`python -m b601.cameras.reference [--record]`
 
     Without --record: check every camera that has a stored reference and exit
@@ -350,43 +516,17 @@ def main(argv=None, grab=grab_landmarks, path=None):
 
     try:
         cameras = load_cameras()
-        detected = grab(cameras)
+        frames = grab(cameras)
     except Exception as exc:                    # hardware, manifest, detection
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     if argv == ["--record"]:
-        # A camera showing no landmarks is NOT an error on its own: the wrist
-        # camera legitimately has none, because a moving camera's landmarks
-        # move with it and only mean anything at a repeatable arm pose. It is
-        # recorded as un-referenced and reported, never skipped silently.
-        seen = {n: m for n, m in detected.items() if m}
-        empty = sorted(n for n, m in detected.items() if not m)
-        if not seen:
-            # Recording nothing would create a check that passes forever while
-            # verifying nothing.
-            print(f"ERROR: no landmarks visible to any camera "
-                  f"({sorted(detected)}) — place ArUco markers "
-                  f"({DEFAULT_DICTIONARY}) in view, fixed to the same "
-                  f"structure as the workspace and outside the area objects "
-                  f"move through", file=sys.stderr)
-            return 1
-        ReferenceSet(method="landmark_drift_reference",
-                     dictionary=DEFAULT_DICTIONARY,
-                     tolerance_px=DEFAULT_TOLERANCE_PX,
-                     cameras=seen).write(path)
-        for name, marks in sorted(seen.items()):
-            print(f"  {name:<14} {len(marks)} landmark(s): {sorted(marks)}")
-        if empty:
-            print(f"  NOT REFERENCED (no landmarks in view): {empty} — these "
-                  f"will report as NOT CHECKED and their mounts are unguarded")
-        print(f"recorded drift reference -> {path}")
-        print("This redefines 'not drifted': re-record CALIBRATION_SHA256 "
-              "and add an experiment-registry entry")
-        return 0
+        return _record(frames, path, detect or detect_landmarks)
 
     try:
         reference = load_reference(path)
+        detected = current_landmarks(reference, frames, path, detect)
         reports, unchecked = check_all(reference, detected)
     except DriftError as exc:
         print(f"ERROR: {exc}\n       run "
@@ -400,6 +540,78 @@ def main(argv=None, grab=grab_landmarks, path=None):
         # Absence of a failure must not read as evidence of no drift.
         print(f"  NOT CHECKED (no stored reference): {list(unchecked)}")
     return 0 if all(r.passed for r in reports) else 1
+
+
+def _record(frames, path, detect):
+    """Capture the reference, choosing the method the scene can actually support."""
+    import sys
+    from b601.cameras.config import load_cameras
+
+    mounts = {c.name: c.mount for c in load_cameras()}
+    # Only FIXED mounts get a reference. A wrist camera's view changes with
+    # every arm pose, so its landmarks would measure the arm rather than the
+    # mount and the check would fail constantly for the wrong reason. It needs
+    # a repeatable arm pose first, which does not exist until safe_home is
+    # trusted.
+    moving = sorted(n for n in frames if mounts.get(n) not in (None, "fixed"))
+    live = {n: f for n, f in frames.items()
+            if f is not None and mounts.get(n, "fixed") == "fixed"}
+    if not live:
+        print("ERROR: no camera produced a frame, so there is nothing to "
+              "record", file=sys.stderr)
+        return 1
+
+    markers = {n: detect(f, DEFAULT_DICTIONARY) for n, f in live.items()}
+    seen = {n: m for n, m in markers.items() if m}
+
+    # ArUco wherever markers are visible, even to only one camera: a wrist
+    # camera without them must not force the fixed camera onto a weaker method.
+    if seen:
+        ReferenceSet(method=ARUCO_METHOD, dictionary=DEFAULT_DICTIONARY,
+                     tolerance_px=DEFAULT_TOLERANCE_PX,
+                     cameras=seen).write(path)
+        for name, marks in sorted(seen.items()):
+            print(f"  {name:<14} ArUco, {len(marks)} landmark(s): "
+                  f"{sorted(marks)}")
+    else:
+        # No markers in view. The scene's own texture carries the reference
+        # instead; RANSAC is what keeps a moved cable from reading as drift.
+        import cv2
+        base = Path(path).parent
+        base.mkdir(parents=True, exist_ok=True)
+        cameras_grid, images = {}, {}
+        for name, frame in sorted(live.items()):
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            try:
+                estimate_homography(gray, gray)     # can this scene be matched?
+            except DriftError as exc:
+                print(f"ERROR: {name}: {exc}", file=sys.stderr)
+                return 1
+            filename = f"calibration_reference_{name}.png"
+            cv2.imwrite(str(base / filename), frame)
+            h, w = gray.shape[:2]
+            cameras_grid[name] = probe_grid(w, h)
+            images[name] = {"file": filename,
+                            "sha256": _sha256(base / filename)}
+            print(f"  {name:<14} ORB homography over natural texture, "
+                  f"{len(cameras_grid[name])} probe points -> {filename}")
+        ReferenceSet(method=ORB_METHOD, dictionary="",
+                     tolerance_px=DEFAULT_TOLERANCE_PX,
+                     cameras=cameras_grid, images=images).write(path)
+
+    if moving:
+        print(f"  NOT REFERENCED: {moving} — not a fixed mount. A wrist "
+              f"camera's view moves with the arm, so a reference would measure "
+              f"the arm, not the mount. Needs a repeatable arm pose first")
+    empty = sorted(n for n in live
+                   if frames[n] is None or (seen and not markers.get(n)))
+    if empty:
+        print(f"  NOT REFERENCED (no landmarks/frame): {empty} — these report "
+              f"as NOT CHECKED and their mounts are unguarded")
+    print(f"recorded drift reference -> {path}")
+    print("This redefines 'not drifted': re-record CALIBRATION_SHA256 "
+          "and add an experiment-registry entry")
+    return 0
 
 
 if __name__ == "__main__":

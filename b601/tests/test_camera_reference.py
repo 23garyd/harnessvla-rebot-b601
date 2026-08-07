@@ -203,28 +203,43 @@ def test_a_referenced_camera_that_produced_no_frame_is_a_failure(tmp_path):
 # --- the command the operator runs ----------------------------------------
 
 def fake_grab(landmarks):
+    """The 'frame' is the landmark dict itself; fake_detect just hands it back.
+    Keeps the CLI's bookkeeping testable with no OpenCV and no cameras."""
     def grab(cameras):
         return {c.name: landmarks.get(c.name, {}) for c in cameras}
     return grab
 
 
+def fake_detect(frame, dictionary=None):
+    return dict(frame or {})
+
+
 def test_record_writes_an_artifact_that_loads_back(tmp_path, capsys):
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
-    rc = main(["--record"], grab=fake_grab({"agentview": ref()}), path=path)
+    rc = main(["--record"], detect=fake_detect, grab=fake_grab({"agentview": ref()}), path=path)
     assert rc == 0
     assert load_reference(path).cameras["agentview"] == ref()
     assert "agentview" in capsys.readouterr().out
 
 
-def test_record_refuses_when_NO_camera_shows_landmarks(tmp_path, capsys):
-    """Recording an empty reference would create a check that passes forever
-    while verifying nothing."""
+def test_record_refuses_when_no_camera_produced_a_frame(tmp_path, capsys):
+    """Recording from nothing would create a check that passes forever while
+    verifying nothing.
+
+    NOTE the premise changed 2026-08-06: an absence of ArUco markers is no
+    longer a refusal, because the ORB fallback records the scene's own texture
+    instead. What is still a refusal is having no FRAME at all — and, on the
+    ORB path, a scene too featureless to match, which `_record` checks by
+    trying to estimate a homography before it writes anything. That branch
+    needs OpenCV and is verified against hardware rather than here."""
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
-    assert main(["--record"], grab=fake_grab({"agentview": {}}), path=path) == 1
+    rc = main(["--record"], detect=fake_detect,
+              grab=lambda cameras: {c.name: None for c in cameras}, path=path)
+    assert rc == 1
     assert not path.exists()
-    assert "no landmarks" in capsys.readouterr().err
+    assert "nothing to record" in capsys.readouterr().err
 
 
 def test_record_succeeds_when_only_some_cameras_have_landmarks(tmp_path, capsys):
@@ -234,7 +249,7 @@ def test_record_succeeds_when_only_some_cameras_have_landmarks(tmp_path, capsys)
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
     rc = main(["--record"],
-              grab=fake_grab({"agentview": ref(), "eye_in_hand": {}}),
+              detect=fake_detect, grab=fake_grab({"agentview": ref(), "eye_in_hand": {}}),
               path=path)
     assert rc == 0
     assert set(load_reference(path).cameras) == {"agentview"}
@@ -244,16 +259,16 @@ def test_record_succeeds_when_only_some_cameras_have_landmarks(tmp_path, capsys)
 def test_check_passes_when_nothing_moved(tmp_path, capsys):
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
-    main(["--record"], grab=fake_grab({"agentview": ref()}), path=path)
-    assert main([], grab=fake_grab({"agentview": ref()}), path=path) == 0
+    main(["--record"], detect=fake_detect, grab=fake_grab({"agentview": ref()}), path=path)
+    assert main([], detect=fake_detect, grab=fake_grab({"agentview": ref()}), path=path) == 0
     assert "DRIFT OK" in capsys.readouterr().out
 
 
 def test_check_fails_when_the_mount_moved(tmp_path, capsys):
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
-    main(["--record"], grab=fake_grab({"agentview": ref()}), path=path)
-    rc = main([], grab=fake_grab({"agentview": shifted(ref(), 20, 0)}),
+    main(["--record"], detect=fake_detect, grab=fake_grab({"agentview": ref()}), path=path)
+    rc = main([], detect=fake_detect, grab=fake_grab({"agentview": shifted(ref(), 20, 0)}),
               path=path)
     assert rc == 1
     assert "DRIFT DETECTED" in capsys.readouterr().out
@@ -261,7 +276,7 @@ def test_check_fails_when_the_mount_moved(tmp_path, capsys):
 
 def test_check_without_a_reference_fails_with_guidance(tmp_path, capsys):
     from b601.cameras.reference import main
-    rc = main([], grab=fake_grab({"agentview": ref()}),
+    rc = main([], detect=fake_detect, grab=fake_grab({"agentview": ref()}),
               path=tmp_path / "nope.json")
     assert rc == 1
     assert "--record" in capsys.readouterr().err
@@ -272,12 +287,122 @@ def test_check_names_cameras_it_could_not_verify(tmp_path, capsys):
     NOT checked, or absence of a failure reads as evidence of no drift."""
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
-    main(["--record"], grab=fake_grab({"agentview": ref()}), path=path)
-    main([], grab=fake_grab({"agentview": ref(), "eye_in_hand": ref()}),
+    main(["--record"], detect=fake_detect, grab=fake_grab({"agentview": ref()}), path=path)
+    main([], detect=fake_detect, grab=fake_grab({"agentview": ref(), "eye_in_hand": ref()}),
          path=path)
     assert "NOT CHECKED" in capsys.readouterr().out
 
 
 def test_unknown_argument_is_rejected(tmp_path):
     from b601.cameras.reference import main
-    assert main(["--force"], grab=fake_grab({}), path=tmp_path / "c.json") == 64
+    assert main(["--force"], detect=fake_detect, grab=fake_grab({}), path=tmp_path / "c.json") == 64
+
+
+# --- marker-free drift: homography over natural scene features ------------
+#
+# Measured on this workspace 2026-08-06: 1512 ORB features in the periphery,
+# 609 of them strong. So markers are not required HERE — the scene carries
+# enough texture on its own. The homography is applied to a fixed grid of probe
+# points, and the displacement of those points is the drift, which means the
+# verdict runs through exactly the same compare_landmarks as the ArUco path.
+
+IDENTITY = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+
+
+def grid():
+    from b601.cameras.reference import probe_grid
+    return probe_grid(640, 480)
+
+
+def test_a_probe_grid_is_deterministic_and_inside_the_frame():
+    g = grid()
+    assert g == grid()
+    assert len(g) >= 4
+    assert all(0 <= x < 640 and 0 <= y < 480 for x, y in g.values())
+
+
+def test_an_identity_homography_moves_nothing():
+    from b601.cameras.reference import homography_landmarks
+    assert homography_landmarks(grid(), IDENTITY) == grid()
+
+
+def test_a_translation_homography_moves_every_point_equally():
+    """A camera nudged sideways translates the whole scene. That is the signal
+    the median displacement is built to catch."""
+    from b601.cameras.reference import homography_landmarks
+    H = ((1.0, 0.0, 12.0), (0.0, 1.0, -5.0), (0.0, 0.0, 1.0))
+    moved = homography_landmarks(grid(), H)
+    for i, (x, y) in grid().items():
+        assert moved[i] == pytest.approx((x + 12.0, y - 5.0))
+    r = compare_landmarks("agentview", grid(), moved, tolerance_px=3.0)
+    assert r.median_displacement_px == pytest.approx(13.0, abs=0.01)
+    assert not r.passed
+
+
+def test_a_rotation_displaces_points_by_different_amounts():
+    """A rotated mount is not a uniform shift: points far from the centre of
+    rotation move further. The check must still fire."""
+    import math
+    from b601.cameras.reference import homography_landmarks
+    a = math.radians(2.0)
+    H = ((math.cos(a), -math.sin(a), 0.0),
+         (math.sin(a), math.cos(a), 0.0), (0.0, 0.0, 1.0))
+    moved = homography_landmarks(grid(), H)
+    d = {i: math.dist(grid()[i], moved[i]) for i in grid()}
+    assert max(d.values()) > min(d.values()) + 1.0
+    assert not compare_landmarks("c", grid(), moved, tolerance_px=3.0).passed
+
+
+def test_perspective_division_is_applied():
+    """The third row is not decorative — ignoring it would under-report drift
+    on a camera that tilted rather than slid."""
+    from b601.cameras.reference import homography_landmarks
+    H = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.001, 0.0, 1.0))
+    moved = homography_landmarks({0: (100.0, 200.0)}, H)
+    assert moved[0] == pytest.approx((100.0 / 1.1, 200.0 / 1.1))
+
+
+def test_a_homography_that_could_not_be_estimated_raises():
+    """cv2 returns None when it cannot find one. Treating that as "no drift"
+    would be a check that passes precisely when it failed."""
+    from b601.cameras.reference import homography_landmarks
+    with pytest.raises(DriftError, match="homography"):
+        homography_landmarks(grid(), None)
+
+
+def test_a_degenerate_homography_raises():
+    from b601.cameras.reference import homography_landmarks
+    with pytest.raises(DriftError, match="homography"):
+        homography_landmarks(grid(), ((0.0,) * 3,) * 3)
+
+
+def test_only_fixed_mounts_are_given_a_drift_reference(tmp_path, capsys):
+    """A wrist camera's view changes with every arm pose, so a reference for it
+    would measure the arm, not the mount, and would fail constantly for the
+    wrong reason. The module docstring said this from the start; the marker-free
+    path recorded one anyway until this test existed.
+
+    Excluded explicitly and reported, never silently: NOT CHECKED must remain
+    distinguishable from checked-and-clean."""
+    from b601.cameras.reference import main
+    path = tmp_path / "calibration.json"
+    rc = main(["--record"], detect=fake_detect,
+              grab=fake_grab({"agentview": ref(), "eye_in_hand": ref()}),
+              path=path)
+    assert rc == 0
+    assert set(load_reference(path).cameras) == {"agentview"}
+    out = capsys.readouterr().out
+    assert "eye_in_hand" in out and "wrist" in out.lower()
+
+
+def test_a_camera_without_an_orb_reference_still_appears_as_unchecked(tmp_path):
+    """It must not simply vanish from the report. Absent reads as 'everything
+    was checked'; NOT CHECKED reads as what it is."""
+    from b601.cameras.reference import ORB_METHOD, current_landmarks
+    path = tmp_path / "calibration.json"
+    ReferenceSet(ORB_METHOD, "", 3.0, {"agentview": ref()},
+                 images={}).write(path)
+    reference = load_reference(path)
+    detected = current_landmarks(reference, {"eye_in_hand": {}}, path,
+                                 detect=fake_detect)
+    assert "eye_in_hand" in detected

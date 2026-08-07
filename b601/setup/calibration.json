@@ -1,0 +1,59 @@
+{
+  "_note": [
+    "Landmark drift reference. NOT a metric calibration: no",
+    "intrinsics, no camera-to-robot transform. It detects that a",
+    "mount MOVED, which is the failure that silently biases every",
+    "episode recorded afterwards (sim finding 3).",
+    "Pinned by CALIBRATION_SHA256 in pins.env. Re-recording it",
+    "redefines 'not drifted' and is a registry event."
+  ],
+  "method": "orb_homography",
+  "dictionary": "",
+  "tolerance_px": 3.0,
+  "cameras": {
+    "agentview": {
+      "0": [
+        160.0,
+        120.0
+      ],
+      "1": [
+        320.0,
+        120.0
+      ],
+      "2": [
+        480.0,
+        120.0
+      ],
+      "3": [
+        160.0,
+        240.0
+      ],
+      "4": [
+        320.0,
+        240.0
+      ],
+      "5": [
+        480.0,
+        240.0
+      ],
+      "6": [
+        160.0,
+        360.0
+      ],
+      "7": [
+        320.0,
+        360.0
+      ],
+      "8": [
+        480.0,
+        360.0
+      ]
+    }
+  },
+  "images": {
+    "agentview": {
+      "file": "calibration_reference_agentview.png",
+      "sha256": "3e663c67d42639550eae0b8ff90844f110745e899d06b570fd4ca12e10b88c10"
+    }
+  }
+}

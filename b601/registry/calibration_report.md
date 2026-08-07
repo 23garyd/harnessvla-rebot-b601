@@ -1,7 +1,14 @@
 # Calibration report — B601 cameras
 
-**Status: method chosen and tooling built; reference not yet captured.**
-Blocked on one physical step — ArUco markers placed in view (see below).
+**Status: drift reference CAPTURED and verifying. No metric calibration.**
+
+Measured 2026-08-06, `agentview`, immediately after recording:
+**median landmark displacement 0.03–0.05 px, max 0.1 px** against a 3.00 px
+tolerance. That is the repeatability floor of the method on this scene, not a
+drift measurement — but it means the tolerance has roughly 30x headroom over
+detection noise, so a real mount movement will stand out clearly.
+
+`CALIBRATION_SHA256=0c26d532b47c…` is recorded in `pins.env` and verifies.
 
 ## The method, and why
 
@@ -9,9 +16,27 @@ The plan permits either a camera-to-robot transform or a documented
 image-space fallback, and requires recording which and why. **Chosen for now:
 a landmark drift reference, which is neither, and deliberately less.**
 
-`b601/cameras/reference.py` records the pixel positions of fixed ArUco markers
-once, and compares them at the start of every session. It yields no intrinsics
-and no camera-to-robot transform. It detects only that a mount MOVED.
+`b601/cameras/reference.py` records landmark positions once and compares them
+at the start of every session. It yields no intrinsics and no camera-to-robot
+transform. It detects only that a mount MOVED.
+
+**No markers were needed.** The workspace was measured first: 1512 ORB features
+in the frame periphery, 609 of them strong. So the method used is
+`orb_homography` — features matched against a stored reference image, RANSAC
+homography, and the displacement of a fixed 9-point probe grid under that
+homography IS the drift. RANSAC is what makes it usable without markers: a
+cable or tool moved in the periphery produces outlier matches, and only a
+coherent shift across many features moves the estimate. The ArUco path remains
+implemented and is selected automatically if markers are ever placed.
+
+The reference IMAGE is what features match against, so its SHA256 is recorded
+inside `calibration.json` — which `CALIBRATION_SHA256` pins in turn. Swapping
+the image under a pinned artifact would otherwise silently redefine "not
+drifted"; the check verifies that hash before comparing.
+
+`eye_in_hand` is deliberately NOT referenced: only fixed mounts are. A wrist
+camera's view moves with the arm, so a reference would measure the arm rather
+than the mount. It reports NOT CHECKED every run.
 
 Why that is the right thing first:
 
@@ -60,24 +85,32 @@ calibration, and only if the metric route is taken.
 | Camera manifest: serial, model, mount, resolution, fps, fixed exposure | **Done** — `b601/setup/cameras.json`, validated on load, plus format, backend and gain |
 | Method recorded, with reasoning | **Done** — this section |
 | **Measured** error at known table points, as a number with units | **Not done.** Requires the metric route; the drift check reports pixels, not millimetres |
-| Restart procedure, evidence landmarks are stable across a restart | **Tooling done**, evidence not captured — needs markers placed |
+| Restart procedure, evidence landmarks are stable across a restart | **Partly done.** The check round-trips at 0.03–0.05 px median across a full camera open/close cycle. Not yet evidenced across a machine REBOOT, which is the case that matters most and is worth one run to confirm |
 | Mount photographs | **Not done** |
-| SHA256 matching `CALIBRATION_SHA256` | Blocked on capturing the reference |
+| SHA256 matching `CALIBRATION_SHA256` | **Done** — `0c26d532b47c…`, recorded and verifying |
 
-## To capture the reference
+## Operating it
 
-1. Place at least three or four `DICT_4X4_50` ArUco markers in `agentview`'s
-   view. **Fix them to the same structure the workspace is fixed to**, and put
-   them outside the area objects move through — the check cannot distinguish a
-   moved camera from a moved marker, and objects move every episode by design.
-   The printed board at `artifacts/day3/charuco_7x5_25mm.png` carries usable
-   markers if a dedicated set is not to hand.
-2. With the cameras in their **final mounted position**:
-   `python -m b601.cameras.reference --record`
-3. Thereafter, at the start of every session:
-   `python -m b601.cameras.reference` — exit 0 clean, 1 if a mount moved.
-4. Re-recording redefines "not drifted": it is a registry event and
-   `CALIBRATION_SHA256` must be re-recorded with it.
+At the start of every session — or just run `b601.cameras.preflight`, which
+includes this:
+
+    python -m b601.cameras.reference        # exit 0 clean, 1 if a mount moved
+
+Re-record ONLY when the cameras have deliberately moved, or the workspace
+periphery has been rearranged enough that matching fails:
+
+    python -m b601.cameras.reference --record
+
+**Re-recording redefines "not drifted".** It is a registry event, and
+`CALIBRATION_SHA256` must be re-recorded with `pin_check.sh --record`
+afterwards or the gate will fail — correctly.
+
+THE STANDING CAVEAT for the marker-free method: the reference is the scene's
+own texture, so rearranging the periphery (moving a cable, a tool, a monitor)
+degrades matching and eventually reads as drift. RANSAC absorbs a few such
+changes; it will not absorb a redecoration. If the check starts failing and the
+cameras demonstrably have not moved, that is the likely cause — and placing
+ArUco markers, which the ArUco path picks up automatically, is the fix.
 
 `eye_in_hand` will report **NOT CHECKED**. That is correct and not a gap to
 paper over: a wrist camera's landmarks move with the arm, so a reference for it

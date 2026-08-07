@@ -1,10 +1,16 @@
-# B601 track dependencies.
+# Dependencies of the UNPOWERED TEST ENVIRONMENT (.venv), and only that.
 #
-# UNVERIFIED ON TARGET. This repo was scaffolded on a machine with an A6000;
-# the B601 track runs on the robot PC (RTX 5090). Versions below are the
-# starting point for Day-2 bring-up, not a validated lock. Once the stack runs
-# on the robot PC, freeze exact versions here and record them via
-# `pin_check.sh --record` — after which a change is a registry event.
+# RESOLVED 2026-08-06: this file does NOT describe the robot stack. The
+# robot-facing environment is the conda env `lerobot`, where the sm_120 gate
+# passes; .venv holds a cu126 torch topping out at sm_90 and exists so the
+# suite runs in CI with no hardware. Trying to make one file describe both
+# would duplicate a hard-won CUDA/ffmpeg setup and risk breaking it.
+#
+# The robot stack is pinned in b601/setup/pins.env, recorded by
+# `B601_PY=<conda python> bash b601/setup/pin_check.sh --record`. That is the
+# file a change to is a registry event. As recorded 2026-08-06:
+#   lerobot 0.4.4 editable+git:fe078af, placo 0.9.23,
+#   lerobot-robot-seeed-b601 1.0.1, torch 2.7.1+cu128 (sm_120 verified)
 #
 # RTX 50-series note: sm_120 needs a recent CUDA build of torch. Installing
 # plain `torch` will likely give you a wheel that cannot run on the 5090 —
