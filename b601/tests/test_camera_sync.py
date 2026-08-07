@@ -371,3 +371,26 @@ def test_tolerance_is_configurable_and_stricter_tolerance_can_fail(tmp_path):
     streams = {"agentview": perfect(), "eye_in_hand": perfect(offset=0.005)}
     assert check_sync(streams, FPS).passed
     assert not check_sync(streams, FPS, offset_tolerance_frames=0.1).passed
+
+
+def test_streams_that_do_not_overlap_in_time_cannot_pass():
+    """FOUND ON HARDWARE. Preflight grabbed the cameras sequentially, so the
+    two streams were 4.2 s apart and shared no common window. Every frame was
+    excluded from pairing, the gap list was left holding only its seed, and the
+    checker reported a 0.00 ms pairing gap and PASSED — a perfect score for
+    comparing nothing. Structural blindness of exactly the kind the pin probes
+    were fixed for."""
+    a = perfect(60)
+    b = [t + 10.0 for t in perfect(60)]      # starts after a has finished
+    rep = check_sync({"agentview": a, "eye_in_hand": b}, FPS)
+    assert rep.pairs_compared == 0
+    assert not rep.passed
+    assert "overlap" in rep.summary()
+
+
+def test_a_single_stream_still_passes_with_no_pairs():
+    """The seed that caused the bug is correct for one stream: there is
+    genuinely nothing to pair against, and that is not a failure."""
+    rep = check_sync({"agentview": perfect()}, FPS)
+    assert rep.pairs_compared == 0
+    assert rep.passed

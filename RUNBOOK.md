@@ -98,7 +98,27 @@ discovered after CAN bring-up and calibration is not.
       is on USB 2.1, which fits colour but not colour plus depth. Address the
       top camera by its `/dev/v4l/by-id/...` path, never `/dev/video0`, which
       renumbers across reboots.
-- [ ] **Timestamp sync check — run this on every recording session (Day 3).**
+- [x] **PREFLIGHT — the one command to run before every recording session.**
+      ```
+      PYTHONNOUSERSITE=1 PYTHONPATH=$PWD \
+        /home/demo/miniforge3/envs/lerobot/bin/python -m b601.cameras.preflight
+      #   exit 0 = safe to record, 1 = do not record yet
+      ```
+      Applies the manifest, verifies the negotiated modes, confirms every
+      camera is DELIVERING FRAMES, checks timing, and checks the mounts have
+      not drifted — in that order, and in one exit code. The individual tools
+      below are still there for diagnosis when it fails.
+
+      Reference numbers on the current topology (both cameras USB 2, separate
+      controllers), 60 frames each:
+      `agentview` mean 33.29 ms / jitter p95 2.74 ms, `eye_in_hand` mean
+      33.30 ms / jitter p95 0.10 ms, 0 dropped, pairing gap p95 17.7 ms.
+      **The pairing gap sits at 0.53 of a frame period, near its structural
+      maximum** — nearest-timestamp pairing between free-running cameras is
+      bounded by half a period plus jitter, so this is expected, not
+      degradation. The tolerance is 0.6 periods, so the margin is thin by
+      design rather than by accident.
+- [ ] **Timestamp sync check — component tool, run standalone to diagnose.**
       ```
       PYTHONPATH= .venv/bin/python -m b601.cameras.sync <timestamps.json>
       #   exit 0 clean, 1 not. Omit "fps" from the file and it checks against

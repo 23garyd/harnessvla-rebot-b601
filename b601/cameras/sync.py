@@ -117,6 +117,10 @@ class SyncReport:
     # cameras, so it fires on stalls.
     pair_gap_p95_s: float
     pair_gap_max_s: float
+    # How many frame pairings were actually computed. Zero across two or more
+    # streams means they share no common window, so the pairing metric is
+    # undefined -- it must not read as a perfect score.
+    pairs_compared: int
     # Frames outside the window every stream covers, excluded from the pairing
     # metric. Counted rather than dropped quietly.
     unpaired_frames: int
@@ -138,7 +142,17 @@ class SyncReport:
             out.append(
                 f"frame count mismatch {self.frame_counts} — the streams "
                 f"cannot be zipped into observations")
-        if self.pair_gap_p95_s > self.offset_tolerance_s:
+        if len(self.streams) > 1 and self.pairs_compared == 0:
+            # FOUND ON HARDWARE: preflight grabbed the cameras sequentially, so
+            # the streams were 4.2 s apart and shared no overlap. Every frame
+            # was excluded from pairing, the gap list held only its seed, and
+            # this reported 0.00 ms and PASSED -- a perfect score for comparing
+            # nothing.
+            out.append(
+                f"the streams do not overlap in time, so no frames could be "
+                f"paired and the alignment was never measured — capture the "
+                f"cameras CONCURRENTLY, not one after the other")
+        elif self.pair_gap_p95_s > self.offset_tolerance_s:
             out.append(
                 f"nearest-frame pairing gap p95 "
                 f"{self.pair_gap_p95_s * 1e3:.1f} ms exceeds "
@@ -319,6 +333,8 @@ def check_sync(streams, fps,
         frame_counts={name: len(ts) for name, ts in sorted(validated.items())},
         pair_gap_p95_s=_p95(gaps),
         pair_gap_max_s=max(gaps),
+        pairs_compared=len(gaps) - 1,          # the seed is not a pairing
+
         unpaired_frames=unpaired,
         max_index_offset_s=max_index_offset,
         drift_s_per_frame=drift,
