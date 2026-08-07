@@ -205,8 +205,12 @@ def test_a_referenced_camera_that_produced_no_frame_is_a_failure(tmp_path):
 def fake_grab(landmarks):
     """The 'frame' is the landmark dict itself; fake_detect just hands it back.
     Keeps the CLI's bookkeeping testable with no OpenCV and no cameras."""
-    def grab(cameras):
-        return {c.name: landmarks.get(c.name, {}) for c in cameras}
+    def grab(cameras, burst=1):
+        out = {}
+        for c in cameras:
+            marks = landmarks.get(c.name, {})
+            out[c.name] = [dict(marks)] * burst if burst > 1 else marks
+        return out
     return grab
 
 
@@ -236,7 +240,7 @@ def test_record_refuses_when_no_camera_produced_a_frame(tmp_path, capsys):
     from b601.cameras.reference import main
     path = tmp_path / "calibration.json"
     rc = main(["--record"], detect=fake_detect,
-              grab=lambda cameras: {c.name: None for c in cameras}, path=path)
+              grab=lambda cameras, burst=1: {c.name: None for c in cameras}, path=path)
     assert rc == 1
     assert not path.exists()
     assert "nothing to record" in capsys.readouterr().err
@@ -406,3 +410,65 @@ def test_a_camera_without_an_orb_reference_still_appears_as_unchecked(tmp_path):
     detected = current_landmarks(reference, {"eye_in_hand": {}}, path,
                                  detect=fake_detect)
     assert "eye_in_hand" in detected
+
+
+# --- phantom rejection: a landmark must prove it is real ------------------
+#
+# MEASURED, repeatedly, on this workspace: the cutting mat's grid makes ArUco
+# hallucinate. Across three separate 15-frame captures it produced ids 17, 22,
+# 10, 34, 37, 38 -- each seen ONCE, 6-18 px, at scattered positions, and id 190
+# once appeared in 10 of 12 frames with 108 px of jitter. Recording any of them
+# as a landmark would bake in something that vanishes on the next run and fails
+# the check forever after, for no real reason.
+#
+# The rule is agreement across frames, not plausibility in one.
+
+def frames_of(*per_frame):
+    return list(per_frame)
+
+
+def test_a_landmark_seen_in_every_frame_at_one_place_is_accepted():
+    from b601.cameras.reference import stable_landmarks
+    seq = frames_of({0: (100.0, 100.0)}, {0: (100.2, 99.9)}, {0: (99.9, 100.1)},
+                    {0: (100.1, 100.0)}, {0: (99.8, 100.0)})
+    out = stable_landmarks(seq)
+    assert set(out) == {0}
+    assert out[0] == pytest.approx((100.0, 100.0), abs=0.2)     # the mean
+
+
+def test_a_landmark_missing_from_any_frame_is_rejected():
+    """The real phantoms were each seen exactly once."""
+    from b601.cameras.reference import stable_landmarks
+    seq = frames_of({0: (100.0, 100.0), 9: (300.0, 200.0)},
+                    *[{0: (100.0, 100.0)}] * 5)
+    assert set(stable_landmarks(seq)) == {0}
+
+
+def test_a_landmark_that_jumps_around_is_rejected():
+    """id 190 was seen in 10 of 12 frames with 108 px of jitter — present often
+    enough to look real, in a different place every time."""
+    from b601.cameras.reference import stable_landmarks
+    seq = frames_of({7: (100.0, 100.0)}, {7: (250.0, 180.0)}, {7: (400.0, 60.0)},
+                    {7: (150.0, 300.0)}, {7: (320.0, 120.0)})
+    assert stable_landmarks(seq) == {}
+
+
+def test_the_jitter_bound_is_configurable():
+    from b601.cameras.reference import stable_landmarks
+    seq = frames_of(*[{0: (100.0, 100.0)}] * 4, {0: (103.0, 100.0)})
+    assert stable_landmarks(seq, max_jitter_px=5.0) != {}
+    assert stable_landmarks(seq, max_jitter_px=0.5) == {}
+
+
+def test_too_few_frames_to_establish_stability_raises():
+    """One frame cannot distinguish a marker from a phantom — every phantom
+    this workspace produced looked perfect in the frame it appeared in."""
+    from b601.cameras.reference import stable_landmarks
+    with pytest.raises(DriftError, match="at least"):
+        stable_landmarks(frames_of({0: (1.0, 1.0)}))
+
+
+def test_no_frames_at_all_raises():
+    from b601.cameras.reference import stable_landmarks
+    with pytest.raises(DriftError, match="at least"):
+        stable_landmarks([])

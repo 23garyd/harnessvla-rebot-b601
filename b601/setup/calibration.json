@@ -7,53 +7,27 @@
     "Pinned by CALIBRATION_SHA256 in pins.env. Re-recording it",
     "redefines 'not drifted' and is a registry event."
   ],
-  "method": "orb_homography",
-  "dictionary": "",
+  "method": "aruco_landmarks",
+  "dictionary": "DICT_4X4_50",
   "tolerance_px": 3.0,
   "cameras": {
     "agentview": {
-      "0": [
-        160.0,
-        120.0
-      ],
       "1": [
-        320.0,
-        120.0
+        149.72916666666666,
+        173.91666666666666
       ],
       "2": [
-        480.0,
-        120.0
-      ],
-      "3": [
-        160.0,
-        240.0
-      ],
-      "4": [
-        320.0,
-        240.0
-      ],
-      "5": [
-        480.0,
-        240.0
+        593.0208333333334,
+        362.5625
       ],
       "6": [
-        160.0,
-        360.0
+        103.6875,
+        319.1875
       ],
-      "7": [
-        320.0,
-        360.0
-      ],
-      "8": [
-        480.0,
-        360.0
+      "11": [
+        538.5625,
+        143.85416666666666
       ]
-    }
-  },
-  "images": {
-    "agentview": {
-      "file": "calibration_reference_agentview.png",
-      "sha256": "3e663c67d42639550eae0b8ff90844f110745e899d06b570fd4ca12e10b88c10"
     }
   }
 }

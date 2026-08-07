@@ -1,14 +1,39 @@
 # Calibration report — B601 cameras
 
-**Status: drift reference CAPTURED and verifying. No metric calibration.**
+**Status: ArUco drift reference CAPTURED and verifying. No metric calibration.**
 
-Measured 2026-08-06, `agentview`, immediately after recording:
-**median landmark displacement 0.03–0.05 px, max 0.1 px** against a 3.00 px
-tolerance. That is the repeatability floor of the method on this scene, not a
-drift measurement — but it means the tolerance has roughly 30x headroom over
-detection noise, so a real mount movement will stand out clearly.
+Method is now `aruco_landmarks` (2026-08-07). Four `DICT_4X4_50` markers were
+placed and are detected in **15/15 frames at 39–41 px with ≤0.2 px jitter**:
 
-`CALIBRATION_SHA256=0c26d532b47c…` is recorded in `pins.env` and verifies.
+| id | centre (px) |
+|---|---|
+| 1 | (149.7, 173.9) |
+| 11 | (538.6, 143.9) |
+| 6 | (103.7, 319.2) |
+| 2 | (593.0, 362.6) |
+
+They span 489 x 219 px as a quadrilateral rather than a thin triangle, which is
+what makes a rotation or tilt detectable — those barely move the centre of a
+cluster and move its extremes a lot.
+
+Measured immediately after recording: **median displacement 0.09 px, max 0.1 px**
+against a 3.00 px tolerance. Roughly 30x headroom over detection noise.
+
+`CALIBRATION_SHA256=a80f3c57b141…` recorded in `pins.env` and verifying. The
+previous ORB reference (`0c26d532b47c`) is superseded; `pin_check` correctly
+FAILED on the hash change before it was re-recorded.
+
+**Getting here took four attempts, and the failures are the useful part:**
+
+| Attempt | Result | Cause |
+|---|---|---|
+| markers ~12 px | 1 of 4 decoded, 5/12 frames | too small — 4x4 needs ~40 px, giving each bit cell ~2 px at 12 px |
+| larger, 32–38 px | 3 of 4, all 15/15 | the fourth was washed out: darkest pixel 120 vs 57–98, no continuous black border to find |
+| fourth moved inward | still 0/15 | not size, focus or contrast — sharpness 3179 and contrast 192 sat mid-range among the working three, and NO dictionary decoded it. The printed pattern itself was not a valid marker |
+| fourth swapped | **4 of 4**, 39–41 px | — |
+
+Do not chase a missing marker with looser `DetectorParameters`: tried, and the
+permissive settings invented `id37` twice among 7307 rejected candidates.
 
 ## The method, and why
 
@@ -20,14 +45,27 @@ a landmark drift reference, which is neither, and deliberately less.**
 at the start of every session. It yields no intrinsics and no camera-to-robot
 transform. It detects only that a mount MOVED.
 
-**No markers were needed.** The workspace was measured first: 1512 ORB features
-in the frame periphery, 609 of them strong. So the method used is
-`orb_homography` — features matched against a stored reference image, RANSAC
-homography, and the displacement of a fixed 9-point probe grid under that
-homography IS the drift. RANSAC is what makes it usable without markers: a
-cable or tool moved in the periphery produces outlier matches, and only a
-coherent shift across many features moves the estimate. The ArUco path remains
-implemented and is selected automatically if markers are ever placed.
+**Both methods are implemented and the right one is chosen automatically.**
+`aruco_landmarks` is used when stable markers are visible, which they now are.
+`orb_homography` is the fallback and was in force 2026-08-06 before markers
+existed: it matches ORB features against a stored reference image (this
+workspace offers 1512 in the periphery, 609 strong), RANSAC-estimates a
+homography, and takes the displacement of a fixed 9-point probe grid under it
+as the drift.
+
+ArUco is preferred here for a specific reason: the ORB periphery in this scene
+includes a **chair, a monitor and garage floor**, all of which can move. RANSAC
+absorbs a few outliers, not a rearrangement. Markers fixed to the workspace are
+immune to that.
+
+**PHANTOM REJECTION IS MANDATORY HERE, and measured.** The green cutting mat's
+grid makes ArUco hallucinate: across four separate captures it produced ids
+10, 17, 22, 34, 37, 38, 45 and 225 — each typically seen once at 6–18 px — and
+on one occasion id 190 in 10 of 12 frames with 108 px of jitter. Recording any
+of them would bake in a landmark that vanishes on the next run and fails the
+check forever after. `--record` therefore takes a 12-frame burst and keeps only
+landmarks present in EVERY frame within 2 px (`stable_landmarks`). It rejected
+`id45` on the recording run that produced the table above.
 
 The reference IMAGE is what features match against, so its SHA256 is recorded
 inside `calibration.json` — which `CALIBRATION_SHA256` pins in turn. Swapping

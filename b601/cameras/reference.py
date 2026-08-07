@@ -267,6 +267,49 @@ WORKSPACE_MASK = (0.20, 0.85, 0.15, 0.85)      # top, bottom, left, right
 MIN_MATCH_INLIERS = 25
 
 
+# A landmark must agree with itself across frames. MEASURED on this workspace:
+# the cutting mat's grid makes ArUco hallucinate ids 10/17/22/34/37/38, each
+# seen once at 6-18 px, and on one occasion id 190 in 10 of 12 frames with
+# 108 px of jitter. Any of them recorded as a landmark would vanish on the next
+# run and fail the check forever after, for no real reason.
+MIN_STABILITY_FRAMES = 5
+STABILITY_BURST = 12
+DEFAULT_JITTER_PX = 2.0
+
+
+def stable_landmarks(per_frame, max_jitter_px=DEFAULT_JITTER_PX):
+    """-> {id: (x, y)} keeping only landmarks seen in EVERY frame at one place.
+
+    `per_frame` is a list of {id: (x, y)} detections, one per frame. A landmark
+    must appear in all of them and stay within `max_jitter_px`; the position
+    returned is the mean, which also averages away detector noise.
+
+    Presence in most frames is deliberately NOT enough. The worst phantom
+    measured here was present in 10 of 12 frames — it was its 108 px of
+    wandering that gave it away, not its rarity.
+    """
+    frames = list(per_frame)
+    if len(frames) < MIN_STABILITY_FRAMES:
+        raise DriftError(
+            f"need at least {MIN_STABILITY_FRAMES} frames to tell a landmark "
+            f"from a detector phantom, got {len(frames)}; a phantom looks "
+            f"perfect in the one frame it appears in")
+
+    common = set(frames[0])
+    for f in frames[1:]:
+        common &= set(f)
+
+    out = {}
+    for i in sorted(common):
+        xs = [f[i][0] for f in frames]
+        ys = [f[i][1] for f in frames]
+        cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
+        spread = max(max(abs(x - cx) for x in xs), max(abs(y - cy) for y in ys))
+        if spread <= max_jitter_px:
+            out[i] = (cx, cy)
+    return out
+
+
 def probe_grid(width, height, divisions=4):
     """-> {i: (x, y)} a deterministic grid of points spanning the frame.
 
@@ -387,8 +430,8 @@ def estimate_homography(reference_gray, current_gray):
     return tuple(tuple(float(v) for v in row) for row in H)
 
 
-def grab_frames(cameras):
-    """-> {camera name: BGR frame} by opening each camera for one frame.
+def grab_frames(cameras, burst=1):
+    """-> {camera name: BGR frame, or list of frames when burst > 1}.
 
     Applies the manifest's settings first: comparing a reference taken under
     fixed exposure against a frame taken under auto exposure would measure the
@@ -410,9 +453,13 @@ def grab_frames(cameras):
                 vp = profile.get_stream(rs.stream.color).as_video_stream_profile()
                 verify_mode(camera, (vp.width(), vp.height(), vp.fps()))
                 for _ in range(30):            # let exposure settle
-                    frames = pipe.wait_for_frames(5000)
-                frame = np.asanyarray(frames.get_color_frame().get_data())
-                frame = frame[:, :, ::-1]      # rgb8 -> BGR for cv2
+                    pipe.wait_for_frames(5000)
+                shots = []
+                for _ in range(burst):
+                    got = pipe.wait_for_frames(5000)
+                    shots.append(np.asanyarray(
+                        got.get_color_frame().get_data())[:, :, ::-1])
+                frame = shots if burst > 1 else shots[0]
             finally:
                 pipe.stop()
         else:
@@ -427,12 +474,18 @@ def grab_frames(cameras):
                 if not cap.isOpened():
                     raise DriftError(f"{camera.name}: could not open "
                                      f"{camera.device}")
+                shots = []
                 for _ in range(30):
-                    ok, frame = cap.read()
+                    ok, got = cap.read()
+                for _ in range(burst):
+                    ok, got = cap.read()
+                    if ok and got is not None:
+                        shots.append(got)
+                frame = (shots if burst > 1 else (shots[0] if shots else None))
                 verify_mode(camera, (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                                      int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                                      int(cap.get(cv2.CAP_PROP_FPS))))
-                if not ok:
+                if not shots:
                     raise DriftError(f"{camera.name}: no frame delivered")
             finally:
                 cap.release()
@@ -516,7 +569,7 @@ def main(argv=None, grab=grab_frames, path=None, detect=None):
 
     try:
         cameras = load_cameras()
-        frames = grab(cameras)
+        frames = grab(cameras, burst=STABILITY_BURST) if argv == ["--record"] else grab(cameras)
     except Exception as exc:                    # hardware, manifest, detection
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -561,7 +614,22 @@ def _record(frames, path, detect):
               "record", file=sys.stderr)
         return 1
 
-    markers = {n: detect(f, DEFAULT_DICTIONARY) for n, f in live.items()}
+    # A burst per camera, then only landmarks that agree across ALL of it.
+    # Measured here: the mat grid hallucinates a marker in roughly one frame in
+    # fifteen, and recording one would fail every subsequent check.
+    markers = {}
+    for n, f in live.items():
+        shots = f if isinstance(f, list) else [f]
+        per_frame = [detect(s_, DEFAULT_DICTIONARY) for s_ in shots]
+        if len(per_frame) >= MIN_STABILITY_FRAMES:
+            markers[n] = stable_landmarks(per_frame)
+            rejected = set().union(*[set(d) for d in per_frame]) - set(markers[n])
+            if rejected:
+                print(f"  {n}: rejected unstable detection(s) "
+                      f"{sorted(rejected)} — seen in some frames only, or "
+                      f"moving between them (detector phantoms)")
+        else:
+            markers[n] = per_frame[0] if per_frame else {}
     seen = {n: m for n, m in markers.items() if m}
 
     # ArUco wherever markers are visible, even to only one camera: a wrist
@@ -581,6 +649,8 @@ def _record(frames, path, detect):
         base.mkdir(parents=True, exist_ok=True)
         cameras_grid, images = {}, {}
         for name, frame in sorted(live.items()):
+            if isinstance(frame, list):
+                frame = frame[0]
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             try:
                 estimate_homography(gray, gray)     # can this scene be matched?
