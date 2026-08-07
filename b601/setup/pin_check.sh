@@ -13,11 +13,23 @@
 #               workspace containment, step distance and home arrival at once
 #   physical  — camera serials, calibration file hash
 #
-# INTERPRETER: probes run under the repository venv, never an ambient `python`.
-# On a normal shell, bare `python` can easily be a conda base or system install
-# carrying a different LeRobot, which would silently gate on the wrong
-# environment. No interpreter override is accepted: use .venv/bin/python or
-# fail.
+# INTERPRETER: probes run under the repository venv by default, never an
+# ambient `python`. On a normal shell, bare `python` can easily be a conda base
+# or system install carrying a different LeRobot, which would silently gate on
+# the wrong environment.
+#
+# B601_PY overrides it, and on this machine it must: the robot-facing
+# environment is the conda env `lerobot`, where the sm_120 gate PASSES, while
+# .venv holds a cu126 torch topping out at sm_90 and exists for the unpowered
+# suite. A gate that can only pin .venv cannot pin the environment that
+# actually drives the arm, which is the whole point of the regime.
+#
+# The override changes WHICH interpreter runs. It never changes whether the
+# interpreter is gated: PYTHON_EXECUTABLE is still recorded and still compared,
+# so recording under conda and verifying under .venv fails exactly as before.
+# And a B601_PY that does not point at an executable is FATAL rather than a
+# fallback to .venv — falling back would gate a different installation than the
+# operator asked for and report agreement.
 #
 # NO SILENT FALLBACKS: a probe that cannot determine its value aborts. An
 # earlier version degraded to `|| echo UNKNOWN`, which recorded UNKNOWN and
@@ -36,8 +48,13 @@ case "${1:-}" in ""|--record) ;; *) usage ;; esac
 fail() { echo "FATAL: $*" >&2; exit 1; }
 
 # --- resolve the interpreter ---------------------------------------------
-PY="$REPO/.venv/bin/python"
-[ -x "$PY" ] || fail "no repository interpreter at $PY — run 'bash b601/setup/setup.sh env' first"
+if [ -n "${B601_PY:-}" ]; then
+    PY="$B601_PY"
+    [ -x "$PY" ] || fail "B601_PY points at '$PY', which is not an executable interpreter. Refusing to fall back to the repository venv: that would gate a different installation than you asked for and call it agreement. Unset B601_PY to use .venv, or fix the path"
+else
+    PY="$REPO/.venv/bin/python"
+    [ -x "$PY" ] || fail "no repository interpreter at $PY — run 'bash b601/setup/setup.sh env' first, or set B601_PY to the environment that drives the robot"
+fi
 
 probe() {
     # $1 = probe name, $2 = optional path. Aborts on probe failure.

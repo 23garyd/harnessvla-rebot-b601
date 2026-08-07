@@ -192,14 +192,30 @@ def test_recorded_pins_carry_the_interpreter_as_a_gated_key(tmp_path):
 # --- pin_check: uses the repo interpreter, fails loudly -------------------
 
 def test_pin_check_cannot_be_redirected_to_ambient_interpreter(tmp_path):
+    """POLICY CHANGED 2026-08-06, and the guarantee got STRONGER.
+
+    This used to assert that B601_PY was silently IGNORED: pointing it at a
+    nonexistent path let pin_check carry on under .venv and fail later, on the
+    missing pins file. The intent was that an ambient `python` must never
+    become the gated interpreter.
+
+    B601_PY is now honoured, because the robot-facing environment is a managed
+    conda env and a gate that can only pin .venv cannot pin the environment
+    that drives the arm. So the same input must now be REFUSED outright rather
+    than quietly substituted — which serves the original intent better: the
+    operator is told their interpreter is wrong instead of having a different
+    one gated behind their back.
+    """
     r = run(
         f"bash {PIN_CHECK}",
         B601_PY="/nonexistent/ambient-python",
         B601_PINS=str(tmp_path / "absent.env"),
     )
     assert r.returncode == 1
-    assert "no pins.env" in r.stderr
-    assert "no repository interpreter" not in r.stderr
+    assert "B601_PY" in r.stderr
+    assert "/nonexistent/ambient-python" in r.stderr
+    # and it must NOT have quietly proceeded under the repo venv
+    assert "no pins.env" not in r.stderr
 
 
 def test_pin_check_aborts_when_a_probe_fails(tmp_path):
@@ -252,3 +268,61 @@ def test_setup_has_no_stage_that_moves_the_robot():
     text = SETUP.read_text()
     for forbidden in ("move_to", "enable()", "set_gripper", "safe_home"):
         assert forbidden not in text, f"setup.sh must not call {forbidden}"
+
+
+# --- B601_PY: the robot PC runs a managed environment ---------------------
+#
+# Decided 2026-08-06. The robot-facing environment is the conda env `lerobot`,
+# where the sm_120 gate PASSES; the repo .venv is a cu126 build topping out at
+# sm_90 and exists only for the unpowered suite. A gate that can only pin .venv
+# cannot pin the environment that drives the arm, which is the entire point of
+# the regime. probe.py's docstring anticipated B601_PY as legitimate; pin_check
+# had removed it.
+#
+# What must NOT follow is a silent fallback. An override that quietly reverts
+# to .venv when it is wrong would gate the wrong installation and report
+# agreement — the failure mode every probe in this file exists to prevent.
+
+def test_b601_py_is_honoured_as_the_interpreter(tmp_path):
+    """Pins recorded under an interpreter must verify under that same one."""
+    pins = pins_file(tmp_path, python_executable=sys.executable)
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins), B601_PY=sys.executable)
+    assert "interpreter drift" not in r.stderr
+
+
+def test_b601_py_pointing_at_nothing_fails_rather_than_falling_back(tmp_path):
+    """THE PROPERTY THAT MATTERS. Falling back to .venv here would verify a
+    different installation than the operator asked for, and say nothing."""
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins_file(tmp_path)),
+            B601_PY=str(tmp_path / "no-such-python"))
+    assert r.returncode == 1
+    assert "B601_PY" in r.stderr
+    assert "no-such-python" in r.stderr
+
+
+def test_b601_py_pointing_at_a_non_executable_fails(tmp_path):
+    dud = tmp_path / "python"
+    dud.write_text("not an interpreter")
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins_file(tmp_path)),
+            B601_PY=str(dud))
+    assert r.returncode == 1
+    assert "B601_PY" in r.stderr
+
+
+def test_without_b601_py_the_repo_venv_is_still_used(tmp_path):
+    """The default must not change: CI and the unpowered suite rely on it."""
+    pins = pins_file(tmp_path, python_executable=str(REPO / ".venv/bin/python"))
+    env = {k: v for k, v in os.environ.items() if k != "B601_PY"}
+    r = subprocess.run(f"bash {PIN_CHECK}", shell=True, capture_output=True,
+                       text=True, cwd=str(REPO),
+                       env={**env, "B601_PINS": str(pins)})
+    assert "interpreter drift" not in r.stderr
+
+
+def test_an_overridden_interpreter_is_still_compared_against_the_pin(tmp_path):
+    """The override changes WHICH interpreter runs, never whether it is gated.
+    Recording under conda and verifying under .venv must still fail."""
+    pins = pins_file(tmp_path, python_executable="/opt/conda/bin/python")
+    r = run(f"bash {PIN_CHECK}", B601_PINS=str(pins), B601_PY=sys.executable)
+    assert r.returncode == 1
+    assert "interpreter drift" in r.stderr
