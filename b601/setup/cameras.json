@@ -20,13 +20,18 @@
     "calibration_report.md permits an image-space staging fallback, so depth is",
     "not required. If depth is ever wanted, move the D405 to a USB 3.x cable",
     "and port FIRST, then re-record these pins.",
-    "eye_in_hand.exposure IS A PLACEHOLDER, and the one number here most likely",
-    "to be wrong. The D405's own default is 33000 us, which auto-exposure",
-    "selected for ambient light; at 30 fps the frame period is 33333 us, so",
-    "that default exposes for essentially the whole frame and would bake",
-    "maximum motion blur into every frame of a MOVING wrist camera. 8000 us is",
-    "roughly a quarter of the frame period, chosen as a starting point, NOT",
-    "measured. Day 3 sets it under actual workspace lighting.",
+    "eye_in_hand exposure/gain MEASURED 2026-08-08 under workspace",
+    "lighting, after episode 0 recorded a near-black wrist stream",
+    "(mean brightness 5-16/255) on the 8000us/gain-16 placeholder.",
+    "Sweep of 10 exposure x gain points with the arm posed mid-grasp:",
+    "8000us + gain 248 (the device maximum) gives mean 85, block and",
+    "fingers clearly resolvable. Exposure stays at a quarter frame",
+    "period DELIBERATELY: the wrist camera moves, and motion blur",
+    "during the approach corrupts the policy's most action-dense",
+    "frames, while gain noise averages out. 16000us was brighter and",
+    "cleaner standing still and pays double the blur mid-motion.",
+    "Gain at the ceiling means no headroom if the room dims - but",
+    "lighting is pinned experiment state anyway.",
     "also has automatic white balance enabled (white_balance_automatic=1,",
     "auto_exposure=3 Aperture Priority). Recording the fixed values below is",
     "not the same as applying them: the capture code must explicitly disable",
@@ -73,7 +78,7 @@
       "height": 480,
       "fps": 30,
       "exposure": 8000,
-      "gain": 16
+      "gain": 248
     }
   ]
 }

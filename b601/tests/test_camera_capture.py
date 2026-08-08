@@ -351,11 +351,14 @@ def test_realsense_reports_no_white_balance_control_on_the_stereo_module():
 
 
 def test_a_real_d405_is_configured_end_to_end_through_apply_settings():
+    """Values track the manifest (gain became 248 when the 2026-08-08
+    exposure sweep replaced the placeholder — episode 0's wrist stream
+    recorded near-black at the gain floor)."""
     s = FakeSensor()
     applied = apply_settings(camera("eye_in_hand"), realsense(s))
     assert s.values["enable_auto_exposure"] == 0.0
     assert s.values["exposure"] == 8000.0
-    assert s.values["gain"] == 16.0
+    assert s.values["gain"] == 248.0
     assert applied.auto_white_balance is None
 
 

@@ -1,6 +1,18 @@
 # Dataset card — B601 demonstration set
 
-**Status: not yet collected.** Populated during Week 2 (plan Days 6–10).
+**Status: pilot in progress.** First episode recorded 2026-08-08; the full
+set is populated during Week 2 (plan Days 6–10).
+
+## Pilot: `local/b601_pilot` (Day-5 gate evidence)
+
+| Episode | Date | Task | Replay | Caveat |
+|---|---|---|---|---|
+| 0 | 2026-08-08 | pick up the red block and place it in the bowl | **correct** (operator judgement) | **Wrist stream untrainable** — recorded under the 8000 µs / gain 16 exposure placeholder, mean brightness 5–16/255. Valid as replay/gate evidence (replay uses no images); quarantined for training. Exposure measured and fixed to 8000 µs / gain 248 immediately after (risk log, `cameras.json`); episodes 1+ record under the measured setting |
+
+667 frames @ 30 fps, both camera streams present
+(`observation.images.agentview`, `observation.images.eye_in_hand`), backed up
+to the NVMe target below. The agentview stream is well exposed (mean 158,
+sharpness ~3600–4100 mid-motion).
 
 The dataset is the irreplaceable asset in this project. A rollout in the
 simulation track could always be re-run; a teleoperation session cannot.
@@ -39,8 +51,10 @@ theft, fire, or an `rm` that takes both mounts. Recorded as a deliberate
 accepted gap rather than a satisfied requirement. A truly off-machine copy of
 the accepted episodes remains worth doing before Day 10.
 
-**Not yet writable.** The mount is `root:root 755`. Before the first pilot
-episode:
-
-    sudo mkdir -p /media/demo/b0b0d284-79d6-4291-93ad-f27ef2f77022/b601
-    sudo chown demo:demo /media/demo/b0b0d284-79d6-4291-93ad-f27ef2f77022/b601
+**Writable since 2026-08-07** (`demo:demo` on the `b601` directory), and the
+first pilot episode's backup landed there 2026-08-08. Two operational notes:
+the udisks mount does NOT survive a reboot — the record script's backup gate
+caught exactly that on the first post-reboot attempt; the morning ritual in
+`HANDOVER.md` now includes `udisksctl mount -b /dev/disk/by-uuid/b0b0d284-…`
+— and mount by UUID only: four identical OWC drives are installed and the
+kernel demonstrably shuffles their `/dev/nvmeX` numbering across reboots.
