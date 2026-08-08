@@ -11,10 +11,14 @@ streams throughout, backed up file-for-file to the NVMe target below.
 | Episodes | Date | Task | Replay | Caveat |
 |---|---|---|---|---|
 | 0 | 2026-08-08 | pick up the red block and place it in the bowl | **correct** (operator judgement) | **Wrist stream untrainable** — recorded under the 8000 µs / gain 16 exposure placeholder, mean brightness 5–16/255. Valid as replay/gate evidence (replay uses no images); quarantined for training. Also recorded under the ORIGINAL workspace layout (black staging board present), unlike every later episode |
-| 1–11 | 2026-08-08 | pick up the red block and place it in the bowl | operator reports replays confirmed — **exact per-episode tally pending**, to be recorded here before the Day-5 gate row is claimed | Recorded under the rebuilt workspace (four corner tags, board removed), measured wrist exposure (8000 µs / gain 248), calibration `f31fe…`→current. These are the first training-grade episodes |
+| 1–11 | 2026-08-08 | pick up the red block and place it in the bowl | **11 of 11 correct** (operator watched each replay, reported 2026-08-08) | Recorded under the rebuilt workspace (four corner tags, board removed), measured wrist exposure (8000 µs / gain 248), calibration `f31fe…`→current. These are the first training-grade episodes |
 
-The Day-5 gate needs ≥9 of 10 replaying correctly, counted per episode by a
-human watching the arm. One rsync note: an earlier backup pass captured
+**DAY-5 GATE: MET.** The gate needs ≥9 of 10 replaying correctly, counted per
+episode by a human watching the arm; the tally is 12 of 12 (episode 0 under
+the old layout plus 11 of 11 under the rebuilt workspace). The recording
+stack is approved for scaled collection, subject to the pre-collection
+decisions in the risk log (staging method + scatter region, off-machine
+backup). One rsync note: an earlier backup pass captured
 LeRobot's transient `images/` frame scratch mid-encode; it was verified
 redundant (all canonical parquet/mp4/meta present both sides) and removed
 from the backup 2026-08-08.
