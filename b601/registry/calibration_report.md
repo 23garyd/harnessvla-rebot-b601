@@ -11,31 +11,34 @@ park pose, so the arm occluded it at every session start. id1 was relocated
 the reference re-recorded with the arm parked in its session-start pose.
 Legitimate re-record: zero episodes exist, so no comparability was broken.
 
-Current reference, `DICT_4X4_50`, stable 15/15 with ≤0.2 px jitter:
+Current reference, `DICT_4X4_50`, four landmarks, each stable 30/30 frames
+with ≤0.3 px jitter, recorded with the arm parked in its session-start pose
+(clear of every marker sightline — id1's original spot sat under the park
+pose, which is what forced the relocation):
 
 | id | centre (px) |
 |---|---|
-| 1 | (117.3, 207.5) |
-| 6 | (91.3, 327.8) |
-| 2 | (580.0, 363.4) |
+| 1 | (117.2, 207.6) |
+| 11 | (522.1, 145.8) |
+| 6 | (91.2, 328.0) |
+| 2 | (579.8, 363.5) |
 
-**Three landmarks, not four — deliberate.** The fourth tag (id11, top-right)
-prints too faint: its dark cells read as pale grey and detection flickers
-8–10/15 frames even after re-inking. The recorder's stability guard excluded
-it, correctly: a marginal marker baked into the reference turns every future
-session gate into a coin flip on lighting. The top-right corner is therefore
-unguarded until the tag is REPLACED with a dark print (proven-good ids are
-taken; pick 3, 4 or 5 — avoid mat-phantom ids 10, 17, 22, 33, 34, 36, 37, 38,
-41, 44, 45), which is a cheap re-record whenever convenient before scaled
-collection.
+Getting id11 in took two physical iterations inside the re-record: the
+original tag printed too faint (dark cells read pale grey; detection
+flickered 8–10/15 across lighting, rotation did not help, re-inking helped
+only briefly) and an interim 3-landmark reference (`cbe222c033a9`) was
+recorded while it was excluded — the recorder's stability guard was right to
+refuse it, since a marginal marker in the reference turns every future
+session gate into a coin flip. The tag was then replaced outright and the
+reference re-recorded the same morning with all four.
 
-Measured immediately after recording: **median displacement 0.03 px, max
-0.2 px** against a 3.00 px tolerance.
+Measured immediately after recording: **median displacement 0.06 px, max
+0.3 px** against a 3.00 px tolerance.
 
-`CALIBRATION_SHA256=cbe222c033a9…` recorded in `pins.env` and verifying
-(supersedes `a80f3c57b141`, which superseded the ORB reference
-`0c26d532b47c`; `pin_check` correctly FAILED on each hash change before the
-re-record).
+`CALIBRATION_SHA256=566455799fbd…` recorded in `pins.env` and verifying
+(supersedes the same-morning 3-landmark `cbe222c033a9`, which superseded
+`a80f3c57b141`, which superseded the ORB reference `0c26d532b47c`;
+`pin_check` correctly FAILED on each hash change before the re-record).
 
 ### The 2026-08-07 reference (superseded)
 
