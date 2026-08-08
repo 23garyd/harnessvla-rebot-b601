@@ -61,9 +61,12 @@ chosen not measured — confirm fingers are resolvable under workspace
 lighting); staging method decision (metric vs image-space) — decide together
 with the block-placement region before scaled collection, since the scatter
 region must be one the staging method can address; backup is on-machine
-only; the two markers on the black board (id1/id6) — confirm whether the
-board is fixed relative to the arm or can slide, asked twice, never
-answered.
+only. RESOLVED 2026-08-08: the black board is fixed relative to the arm
+(operator confirmed), so its two markers (id1/id6) are valid drift
+landmarks. Watch cable routing instead — the D405's short wrist cable
+drooped over id1 mid-session and failed the gate; a USB 3 extension (not
+USB 2, which forecloses wrist depth while the staging method is undecided)
+is the durable fix.
 
 **Before powered motion beyond teleop:** `safe_home()` guards its endpoints
 but the trajectory between them is still the vendor driver's — as are timeout
