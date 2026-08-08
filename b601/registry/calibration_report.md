@@ -60,6 +60,23 @@ transfer unchanged.
 Do not chase a missing marker with looser `DetectorParameters`: tried, and the
 permissive settings invented `id37` twice among 7307 rejected candidates.
 
+**Check-time stability is majority-vote, not perfect attendance (2026-08-08).**
+Measured: real inked tags at their reference positions detect in 21–30 of 30
+frames with ≤0.5 px spread, varying run to run with nothing physically
+changed — per-frame dropout under room lighting is detection noise, the same
+class of signal as V4L2 timing jitter (whose verdict is p95, not max, for the
+same reason). The check path originally detected on a SINGLE frame, so a
+77%-presence tag failed the gate about one run in four; an afternoon went
+into inking and re-taping tags the gate then failed anyway. What separates
+real landmarks from phantoms in every measurement here is POSITION (phantoms
+are rare — 1–4 of 30 — or they wander, 108 px over 10 of 12 frames), so
+`observed_landmarks` accepts a landmark seen in strictly more than half the
+burst within the same 2 px jitter bound. RECORDING still demands presence in
+every frame (`stable_landmarks`): a reference must refuse marginal tags, and
+twice did, correctly. Verified: three consecutive preflights, 4/4 landmarks,
+0.29–0.31 px median. The tag-quality work was still right — it moved tags
+from 53–67% presence (junk, correctly excluded) to 70–100% (healthy).
+
 ## The method, and why
 
 The plan permits either a camera-to-robot transform or a documented

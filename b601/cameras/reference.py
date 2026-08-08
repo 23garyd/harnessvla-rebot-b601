@@ -310,6 +310,49 @@ def stable_landmarks(per_frame, max_jitter_px=DEFAULT_JITTER_PX):
     return out
 
 
+def observed_landmarks(per_frame, max_jitter_px=DEFAULT_JITTER_PX):
+    """-> {id: (x, y)} keeping landmarks seen in MOST frames at one place.
+
+    The CHECK-time criterion, deliberately looser than `stable_landmarks`
+    (which records references). Measured 2026-08-08: real inked tags at their
+    reference positions detect in 21-30 of 30 frames with <=0.5 px spread,
+    varying run to run with nothing physically changed — per-frame dropout
+    under room lighting is detection noise, the same class of signal as V4L2
+    timing jitter. Demanding perfect attendance made the session gate a dice
+    roll on healthy hardware.
+
+    What separates real landmarks from phantoms in every measurement this
+    workspace has produced is POSITION, with rarity as a backstop: phantoms
+    are rare (1-4 of 30, scattered ids) or they wander (10 of 12 frames with
+    108 px of jitter). So: strictly more than half the frames, within the
+    same jitter bound, position the mean over the frames where present.
+    Presence must never outvote position.
+
+    Recording stays with `stable_landmarks`: a reference should refuse
+    marginal tags, and did — twice, correctly.
+    """
+    frames = list(per_frame)
+    if len(frames) < MIN_STABILITY_FRAMES:
+        raise DriftError(
+            f"need at least {MIN_STABILITY_FRAMES} frames to tell a landmark "
+            f"from a detector phantom, got {len(frames)}; a phantom looks "
+            f"perfect in the one frame it appears in")
+
+    ids = set().union(*[set(f) for f in frames])
+    out = {}
+    for i in sorted(ids):
+        seen = [f[i] for f in frames if i in f]
+        if len(seen) * 2 <= len(frames):        # a majority, strictly
+            continue
+        xs = [p[0] for p in seen]
+        ys = [p[1] for p in seen]
+        cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
+        spread = max(max(abs(x - cx) for x in xs), max(abs(y - cy) for y in ys))
+        if spread <= max_jitter_px:
+            out[i] = (cx, cy)
+    return out
+
+
 def probe_grid(width, height, divisions=4):
     """-> {i: (x, y)} a deterministic grid of points spanning the frame.
 
@@ -515,6 +558,16 @@ def current_landmarks(reference, frames, path, detect=None):
     base = Path(path).parent
     out = {}
     for name, frame in frames.items():
+        burst = frame if isinstance(frame, list) else [frame]
+        if reference.method != ORB_METHOD and len(burst) >= MIN_STABILITY_FRAMES:
+            # ArUco over the whole burst: a check accepts a landmark seen in
+            # most frames at one place (measured: healthy tags drop frames
+            # under room lighting; phantoms are rare or they wander).
+            out[name] = observed_landmarks(
+                [detect(shot, reference.dictionary or DEFAULT_DICTIONARY)
+                 for shot in burst])
+            continue
+        frame = burst[-1]
         if reference.method == ORB_METHOD:
             if name not in reference.images:
                 # No reference for it (a wrist camera). Carry it through as
@@ -569,7 +622,11 @@ def main(argv=None, grab=grab_frames, path=None, detect=None):
 
     try:
         cameras = load_cameras()
-        frames = grab(cameras, burst=STABILITY_BURST) if argv == ["--record"] else grab(cameras)
+        # A burst either way: recording demands a landmark in EVERY frame
+        # (stable_landmarks); checking accepts a positionally-tight majority
+        # (observed_landmarks). A single frame made the check a dice roll —
+        # measured: healthy inked tags detect in 21-30 of 30 frames.
+        frames = grab(cameras, burst=STABILITY_BURST)
     except Exception as exc:                    # hardware, manifest, detection
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

@@ -159,7 +159,9 @@ def main(argv=None):
                                       open_backend, verify_mode)
     from b601.cameras.config import (CameraManifestError, load_cameras,
                                      record_fps)
-    from b601.cameras.reference import (DriftError, check_all, detect_landmarks,
+    from b601.cameras.reference import (MIN_STABILITY_FRAMES, DriftError,
+                                        check_all, detect_landmarks,
+                                        observed_landmarks,
                                         load_reference)
     from b601.cameras.sync import check_sync
 
@@ -229,14 +231,20 @@ def main(argv=None):
 
     liveness, stamps, landmarks = [], {}, {}
     for camera in cameras:
-        received, timed_out, ts, frame = results.get(
-            camera.name, (0, True, [], None))
+        received, timed_out, ts, tail = results.get(
+            camera.name, (0, True, [], []))
         liveness.append(check_liveness(camera.name, FRAMES, received,
                                        timed_out))
         if ts:
             stamps[camera.name] = ts
-        if frame is not None:
-            landmarks[camera.name] = detect_landmarks(frame)
+        if len(tail) >= MIN_STABILITY_FRAMES:
+            # Vote over the burst: a landmark counts when seen in most frames
+            # at one place. Single-frame detection made the drift gate a dice
+            # roll — healthy inked tags measure 21-30/30 under room lighting.
+            landmarks[camera.name] = observed_landmarks(
+                [detect_landmarks(f) for f in tail])
+        elif tail:
+            landmarks[camera.name] = detect_landmarks(tail[-1])
 
     if not stamps:
         ok, text = summarise(liveness, _NoSync(), [], (), links=links)
@@ -263,8 +271,14 @@ class _NoSync:
         return "SYNC NOT RUN: no camera produced timestamps"
 
 
-def _grab(camera, frames, verify_mode, gate=None):
-    """-> (received, timed_out, timestamps, last_frame). Hardware.
+def _grab(camera, frames, verify_mode, gate=None, keep=None):
+    """-> (received, timed_out, timestamps, last_frames). Hardware.
+
+    `last_frames` is a list of the trailing `keep` frames (default
+    STABILITY_BURST from the reference module) rather than a single frame:
+    the drift check votes over a burst — a landmark seen in most frames at
+    one place — because per-frame dropout under room lighting made a
+    single-frame check a dice roll on healthy tags (measured 21-30/30).
 
     `gate` is a barrier every camera waits on once it is OPEN but BEFORE it
     warms up, so the timed sections overlap. Without it the streams share no
@@ -277,6 +291,10 @@ def _grab(camera, frames, verify_mode, gate=None):
     the gate drains that queue.
     """
     import time
+    from collections import deque
+
+    from b601.cameras.reference import STABILITY_BURST
+    tail = deque(maxlen=keep or STABILITY_BURST)
     if camera.backend == "realsense":
         import numpy as np
         import pyrealsense2 as rs
@@ -288,7 +306,7 @@ def _grab(camera, frames, verify_mode, gate=None):
         try:
             vp = profile.get_stream(rs.stream.color).as_video_stream_profile()
             verify_mode(camera, (vp.width(), vp.height(), vp.fps()))
-            ts, frame = [], None
+            ts = []
             if gate is not None:
                 gate.wait(timeout=60)
             for _ in range(30):
@@ -296,8 +314,9 @@ def _grab(camera, frames, verify_mode, gate=None):
             for _ in range(frames):
                 got = pipe.wait_for_frames(5000)
                 ts.append(time.perf_counter())
-                frame = np.asanyarray(got.get_color_frame().get_data())[:, :, ::-1]
-            return len(ts), False, ts, frame
+                tail.append(np.asanyarray(
+                    got.get_color_frame().get_data())[:, :, ::-1])
+            return len(ts), False, ts, list(tail)
         finally:
             pipe.stop()
     import cv2
@@ -308,7 +327,7 @@ def _grab(camera, frames, verify_mode, gate=None):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, camera.height)
         cap.set(cv2.CAP_PROP_FPS, camera.fps)
         if not cap.isOpened():
-            return 0, True, [], None
+            return 0, True, [], []
         if gate is not None:
             gate.wait(timeout=60)
         for _ in range(30):
@@ -316,14 +335,14 @@ def _grab(camera, frames, verify_mode, gate=None):
         verify_mode(camera, (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                              int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                              int(cap.get(cv2.CAP_PROP_FPS))))
-        ts, frame = [], None
+        ts = []
         for _ in range(frames):
             ok, got = cap.read()
             if not ok:
-                return len(ts), True, ts, frame
+                return len(ts), True, ts, list(tail)
             ts.append(time.perf_counter())
-            frame = got
-        return len(ts), False, ts, frame
+            tail.append(got)
+        return len(ts), False, ts, list(tail)
     finally:
         cap.release()
 

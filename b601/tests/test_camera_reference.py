@@ -472,3 +472,79 @@ def test_no_frames_at_all_raises():
     from b601.cameras.reference import stable_landmarks
     with pytest.raises(DriftError, match="at least"):
         stable_landmarks([])
+
+
+# --- check-time stability: majority presence, not perfect attendance --------
+#
+# MEASURED 2026-08-08, and it made the session gate a dice roll. Real inked
+# tags at their reference positions detected in 21-30 of 30 frames with at
+# most 0.5 px of jitter, varying run to run with NOTHING physically changed —
+# per-frame dropout under room lighting is detection noise, the same class of
+# signal as V4L2 timing jitter. The check path then detected on a SINGLE
+# frame, so a 77%-presence tag failed the gate about one run in four.
+#
+# What actually separates real landmarks from phantoms in every measurement
+# this workspace has produced is POSITION, plus rarity as a backstop:
+#   real tags:  21-30/30 frames, <=0.5 px spread, at the reference position
+#   phantoms:   1-4/30 frames scattered, or 10/12 frames WANDERING 108 px
+# A majority-presence rule with the same jitter bound keeps every measured
+# phantom out and stops failing healthy tags for imperfect attendance.
+#
+# RECORDING stays all-frames strict (stable_landmarks): a reference should
+# refuse marginal tags, and did — twice, correctly. Only the CHECK, whose
+# question is "is the recorded landmark still where it was?", accepts
+# majority evidence.
+
+def test_a_landmark_present_in_most_frames_at_one_place_is_observed():
+    """THE CASE: id2 inked, unmoved, 23/30 frames, 0.2 px jitter — failed."""
+    from b601.cameras.reference import observed_landmarks
+    seq = frames_of(*[{2: (580.0, 363.5)}] * 11, *[{}] * 4)
+    out = observed_landmarks(seq)
+    assert set(out) == {2}
+    assert out[2] == pytest.approx((580.0, 363.5), abs=0.1)
+
+
+def test_a_landmark_in_exactly_half_the_frames_is_not_a_majority():
+    """The worst real tag measured was 21/30 (70%); the most frequent phantom
+    4/30 (13%). Half sits in the gap and reads as neither — fail closed."""
+    from b601.cameras.reference import observed_landmarks
+    seq = frames_of(*[{5: (10.0, 10.0)}] * 5, *[{}] * 5)
+    assert observed_landmarks(seq) == {}
+
+
+def test_a_rare_phantom_is_rejected():
+    """Mat phantoms: ids 10/16/17/24/33/34/36/37/44/45, each 1-4 frames of 30."""
+    from b601.cameras.reference import observed_landmarks
+    seq = frames_of({7: (300.0, 200.0)}, *[{}] * 9)
+    assert observed_landmarks(seq) == {}
+
+
+def test_a_frequent_but_wandering_phantom_is_still_rejected():
+    """id 190: 10 of 12 frames, 108 px of jitter. Presence must never
+    outvote position — position is the discriminator, rarity the backstop."""
+    from b601.cameras.reference import observed_landmarks
+    seq = frames_of({7: (100.0, 100.0)}, {7: (250.0, 180.0)},
+                    {7: (400.0, 60.0)}, {7: (150.0, 300.0)},
+                    {7: (320.0, 120.0)}, {7: (208.0, 90.0)})
+    assert observed_landmarks(seq) == {}
+
+
+def test_the_observed_position_is_the_mean_over_frames_where_present():
+    from b601.cameras.reference import observed_landmarks
+    seq = frames_of({1: (99.0, 100.0)}, {1: (101.0, 100.0)},
+                    {1: (100.0, 99.0)}, {1: (100.0, 101.0)}, {})
+    assert observed_landmarks(seq)[1] == pytest.approx((100.0, 100.0))
+
+
+def test_observation_needs_enough_frames_to_vote():
+    """A majority of one frame is the single-frame dice roll again."""
+    from b601.cameras.reference import observed_landmarks
+    with pytest.raises(DriftError, match="at least"):
+        observed_landmarks(frames_of({0: (1.0, 1.0)}, {0: (1.0, 1.0)}))
+
+
+def test_a_perfectly_attending_landmark_is_still_observed():
+    """The relaxation must not lose anything stable_landmarks accepts."""
+    from b601.cameras.reference import observed_landmarks, stable_landmarks
+    seq = frames_of(*[{0: (100.0, 100.0)}] * 6)
+    assert observed_landmarks(seq) == stable_landmarks(seq)
