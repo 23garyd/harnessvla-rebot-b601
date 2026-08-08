@@ -5,14 +5,19 @@ set is populated during Week 2 (plan Days 6–10).
 
 ## Pilot: `local/b601_pilot` (Day-5 gate evidence)
 
-| Episode | Date | Task | Replay | Caveat |
-|---|---|---|---|---|
-| 0 | 2026-08-08 | pick up the red block and place it in the bowl | **correct** (operator judgement) | **Wrist stream untrainable** — recorded under the 8000 µs / gain 16 exposure placeholder, mean brightness 5–16/255. Valid as replay/gate evidence (replay uses no images); quarantined for training. Exposure measured and fixed to 8000 µs / gain 248 immediately after (risk log, `cameras.json`); episodes 1+ record under the measured setting |
+**12 episodes, 7031 frames @ 30 fps** as of 2026-08-08 evening, both camera
+streams throughout, backed up file-for-file to the NVMe target below.
 
-667 frames @ 30 fps, both camera streams present
-(`observation.images.agentview`, `observation.images.eye_in_hand`), backed up
-to the NVMe target below. The agentview stream is well exposed (mean 158,
-sharpness ~3600–4100 mid-motion).
+| Episodes | Date | Task | Replay | Caveat |
+|---|---|---|---|---|
+| 0 | 2026-08-08 | pick up the red block and place it in the bowl | **correct** (operator judgement) | **Wrist stream untrainable** — recorded under the 8000 µs / gain 16 exposure placeholder, mean brightness 5–16/255. Valid as replay/gate evidence (replay uses no images); quarantined for training. Also recorded under the ORIGINAL workspace layout (black staging board present), unlike every later episode |
+| 1–11 | 2026-08-08 | pick up the red block and place it in the bowl | operator reports replays confirmed — **exact per-episode tally pending**, to be recorded here before the Day-5 gate row is claimed | Recorded under the rebuilt workspace (four corner tags, board removed), measured wrist exposure (8000 µs / gain 248), calibration `f31fe…`→current. These are the first training-grade episodes |
+
+The Day-5 gate needs ≥9 of 10 replaying correctly, counted per episode by a
+human watching the arm. One rsync note: an earlier backup pass captured
+LeRobot's transient `images/` frame scratch mid-encode; it was verified
+redundant (all canonical parquet/mp4/meta present both sides) and removed
+from the backup 2026-08-08.
 
 The dataset is the irreplaceable asset in this project. A rollout in the
 simulation track could always be re-run; a teleoperation session cannot.
