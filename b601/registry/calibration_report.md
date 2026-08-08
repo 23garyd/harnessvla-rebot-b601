@@ -2,26 +2,48 @@
 
 **Status: ArUco drift reference CAPTURED and verifying. No metric calibration.**
 
-Method is now `aruco_landmarks` (2026-08-07). Four `DICT_4X4_50` markers were
-placed and are detected in **15/15 frames at 39–41 px with ≤0.2 px jitter**:
+**RE-RECORDED 2026-08-08** after the drift gate caught a real event: the top
+camera was nudged during 2026-08-07's USB-cable work (median 6.47 px, all
+markers displaced right 3–7 px with inconsistent directions — a small
+rotation), and marker id1's original spot turned out to sit under the arm's
+park pose, so the arm occluded it at every session start. id1 was relocated
+(down-right, out of the dark top-left corner where it would not decode) and
+the reference re-recorded with the arm parked in its session-start pose.
+Legitimate re-record: zero episodes exist, so no comparability was broken.
+
+Current reference, `DICT_4X4_50`, stable 15/15 with ≤0.2 px jitter:
 
 | id | centre (px) |
 |---|---|
-| 1 | (149.7, 173.9) |
-| 11 | (538.6, 143.9) |
-| 6 | (103.7, 319.2) |
-| 2 | (593.0, 362.6) |
+| 1 | (117.3, 207.5) |
+| 6 | (91.3, 327.8) |
+| 2 | (580.0, 363.4) |
 
-They span 489 x 219 px as a quadrilateral rather than a thin triangle, which is
-what makes a rotation or tilt detectable — those barely move the centre of a
-cluster and move its extremes a lot.
+**Three landmarks, not four — deliberate.** The fourth tag (id11, top-right)
+prints too faint: its dark cells read as pale grey and detection flickers
+8–10/15 frames even after re-inking. The recorder's stability guard excluded
+it, correctly: a marginal marker baked into the reference turns every future
+session gate into a coin flip on lighting. The top-right corner is therefore
+unguarded until the tag is REPLACED with a dark print (proven-good ids are
+taken; pick 3, 4 or 5 — avoid mat-phantom ids 10, 17, 22, 33, 34, 36, 37, 38,
+41, 44, 45), which is a cheap re-record whenever convenient before scaled
+collection.
 
-Measured immediately after recording: **median displacement 0.09 px, max 0.1 px**
-against a 3.00 px tolerance. Roughly 30x headroom over detection noise.
+Measured immediately after recording: **median displacement 0.03 px, max
+0.2 px** against a 3.00 px tolerance.
 
-`CALIBRATION_SHA256=a80f3c57b141…` recorded in `pins.env` and verifying. The
-previous ORB reference (`0c26d532b47c`) is superseded; `pin_check` correctly
-FAILED on the hash change before it was re-recorded.
+`CALIBRATION_SHA256=cbe222c033a9…` recorded in `pins.env` and verifying
+(supersedes `a80f3c57b141`, which superseded the ORB reference
+`0c26d532b47c`; `pin_check` correctly FAILED on each hash change before the
+re-record).
+
+### The 2026-08-07 reference (superseded)
+
+Four markers, recorded before the camera nudge: id1 (149.7, 173.9),
+id11 (538.6, 143.9), id6 (103.7, 319.2), id2 (593.0, 362.6), spanning
+489 x 219 px. Verified at 0.09 px median immediately after recording. Its
+capture story below still holds — the marker-size and print-quality findings
+transfer unchanged.
 
 **Getting here took four attempts, and the failures are the useful part:**
 
