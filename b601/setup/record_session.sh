@@ -84,13 +84,28 @@ echo "  $BACKUP is writable ($(df -h "$BACKUP" | awk 'NR==2{print $4}') free)"
 # FileExistsError. Clear the skeleton, but NEVER anything holding episodes: a
 # teleop session cannot be regenerated, and an accidental clobber here is the
 # single most expensive mistake available in this project.
+#
+# APPENDING is the exception: pass --resume=true (forwarded to lerobot-record,
+# which loads the existing dataset and sanity-checks compatibility) and the
+# guard inverts — existing episodes are then EXPECTED, not a hazard.
+RESUME=false
+for arg in "${@:3}"; do [ "$arg" = "--resume=true" ] && RESUME=true; done
 if [ -d "$DATASET_ROOT" ]; then
     EXISTING="$(find "$DATASET_ROOT" \( -name '*.parquet' -o -name '*.mp4' \) 2>/dev/null | head -1)"
-    if [ -n "$EXISTING" ]; then
-        fail "$DATASET_ROOT already holds recorded episodes (e.g. $EXISTING). Refusing to touch it — set B601_DATASET_ID to a new name, or move the existing dataset aside deliberately"
+    if [ -n "$EXISTING" ] && ! $RESUME; then
+        fail "$DATASET_ROOT already holds recorded episodes (e.g. $EXISTING). Refusing to touch it — pass --resume=true to append, set B601_DATASET_ID to a new name, or move the existing dataset aside deliberately"
     fi
-    echo "  clearing an empty dataset skeleton from an aborted run (no episode data present)"
-    rm -rf "$DATASET_ROOT"
+    if [ -z "$EXISTING" ]; then
+        if $RESUME; then
+            fail "--resume=true but $DATASET_ROOT holds no episodes to resume — drop the flag for a fresh recording"
+        fi
+        echo "  clearing an empty dataset skeleton from an aborted run (no episode data present)"
+        rm -rf "$DATASET_ROOT"
+    else
+        echo "  resuming: appending to $(find "$DATASET_ROOT" -name '*.parquet' -path '*/data/*' | wc -l) existing data file(s) in $DATASET_ROOT"
+    fi
+elif $RESUME; then
+    fail "--resume=true but $DATASET_ROOT does not exist — drop the flag for a fresh recording"
 fi
 
 CAMERAS="$(run_py -m b601.cameras.lerobot_config)" || fail "could not derive the camera argument from cameras.json"
