@@ -365,3 +365,33 @@ recording path applies them yet.
 | Landmark stability across a restart | Not tested |
 | `CALIBRATION_SHA256` / `CAMERA_SERIALS` recorded via `pin_check.sh --record` | Blocked: `--record` is all-or-nothing and needs the calibration file |
 | Fixed exposure and white balance actually applied in the capture path | **Not done** |
+
+## Day 4–5 — 2026-08-08: first episodes, Day-5 gate MET, training pipeline proven
+
+The 0-frame D405 was root-caused (two stacked defects: the vendor null-frame
+bug, fixed as `3b4f877` and re-pinned, and the one-session-per-reset firmware
+behaviour, worked around by `b601.cameras.reset` in the session script — see
+risk_log). Wrist exposure measured under workspace lighting (8000 µs /
+gain 248) after episode 0 recorded a near-black wrist stream on the
+placeholder. The drift gate caught two real events (a 26 px camera bump; a
+cable drooped over a marker) and one wrong metric of its own — check-time
+stability now votes over a burst (`observed_landmarks`) instead of demanding
+perfect attendance, for the same reason sync jitter uses p95. Workspace
+rebuilt by the operator: four dark corner tags, occlusion zones cleared.
+
+**`local/b601_pilot`: 12 episodes, 7031 frames.** Replay verdicts by the
+operator watching the arm: **12 of 12 correct.**
+
+### Day-5 gate: MET (threshold ≥9 of 10)
+
+**ACT training pipeline smoke test PASSED** on episodes 1–11 (episode 0 is
+training-quarantined): 52M-param ACT, 1000 steps on the RTX 5090, loss
+9.80 → 1.87 monotone, 74 ms/update with 4–13 ms data loading (AV1 decode
+keeps up), checkpoint + optimizer state saved and verified on disk
+(`artifacts/act_smoke_2026-08-08`). The policy is junk by design; the
+pipeline is the deliverable. Days 11–14 training has no untested toolchain
+left.
+
+Before scaled collection (Days 6–10): staging method + block-scatter region
+(one decision, see HANDOVER), off-machine backup, and the Day-1 mentor gate
+paperwork. 495 tests, 2 skipped.
