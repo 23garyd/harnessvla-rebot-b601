@@ -35,33 +35,35 @@ them the USB link (the D405 now sits on a verified USB 3.2 / 5 Gbps cable):
 Full story: risk_log.md rows of 2026-08-06/07, protocol_deviations.md (two
 vendor patches), RUNBOOK.md "one pipeline session per reset" item.
 
-## TOMORROW MORNING — power-up and first episode
+## EVERY MORNING — the power-up ritual (all of it recurs per boot)
 1. **Power the arm, bring up CAN** (needs sudo, password location is in the
    session memory): `sudo ip link set can0 up type can bitrate 1000000`
-   — required after every boot.
-2. **The one open blocker: agentview mount drift.** The top camera moved
-   during yesterday's cable work — drift gate fails with median 6.47 px
-   (tolerance 3.0), and marker **id1 (top-left of the view) is not detected
-   at all** — check whether something now covers it. Measured displacements:
-   id2 +3.0 px right, id6 +6.2 px, id11 +7.2 px, directions inconsistent →
-   the camera ROTATED slightly rather than slid.
-   Either nudge the camera back until preflight passes, or — since zero
-   episodes exist, this is cheap — accept the new position and re-record the
-   reference (`python -m b601.cameras.reference --record`, then re-pin
-   `CALIBRATION_SHA256`, registry event). id1 must be visible again first
-   either way: a 3-marker reference is a weaker guard.
-3. **Record the first episode:**
-   `bash b601/setup/record_session.sh "pick up the red block and place it in the bowl" 1`
-   The script gates everything (pins, capture, preflight, D405 resets,
+2. **Mount the backup drive** (no sudo needed; udisks mounts do NOT survive
+   a reboot, and the record script's backup gate fails without it —
+   measured 2026-08-08, first thing it caught):
+   `udisksctl mount -b /dev/disk/by-uuid/b0b0d284-79d6-4291-93ad-f27ef2f77022`
+   By UUID, never by /dev/nvmeXn1pY — four identical OWC drives are
+   installed and the kernel demonstrably shuffles their numbering across
+   reboots.
+3. **Park the arm in its session-start pose** — the drift reference was
+   recorded with it there, clear of every marker sightline. (2026-08-08: the
+   morning drift failure was real — camera nudged during cable work AND the
+   arm's old park pose occluded marker id1. Reference re-recorded, 4 ArUco
+   landmarks, all 30/30 stable; the faint id11 tag was replaced.)
+4. **Record:**
+   `bash b601/setup/record_session.sh "<task>" <episodes>`
+   The script gates everything (pins, D405 resets, capture, preflight,
    backup) and prints the replay command at the end.
-4. **Replay it and watch the arm** — the Day-5 gate is a human judgement.
+5. **Replay and watch the arm** — the Day-5 gate is a human judgement.
 
 Still open behind that: eye_in_hand exposure is a PLACEHOLDER (8000 µs,
 chosen not measured — confirm fingers are resolvable under workspace
-lighting); staging method decision (metric vs image-space); backup is
-on-machine only; the two markers on the black board (id1/id6) — confirm
-whether the board is fixed relative to the arm or can slide, asked twice,
-never answered.
+lighting); staging method decision (metric vs image-space) — decide together
+with the block-placement region before scaled collection, since the scatter
+region must be one the staging method can address; backup is on-machine
+only; the two markers on the black board (id1/id6) — confirm whether the
+board is fixed relative to the arm or can slide, asked twice, never
+answered.
 
 **Before powered motion beyond teleop:** `safe_home()` guards its endpoints
 but the trajectory between them is still the vendor driver's — as are timeout
