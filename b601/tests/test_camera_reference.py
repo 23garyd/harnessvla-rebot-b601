@@ -548,3 +548,61 @@ def test_a_perfectly_attending_landmark_is_still_observed():
     from b601.cameras.reference import observed_landmarks, stable_landmarks
     seq = frames_of(*[{0: (100.0, 100.0)}] * 6)
     assert observed_landmarks(seq) == stable_landmarks(seq)
+
+
+# --- one phantom-poisoned frame must not sink a consistent landmark ---------
+#
+# MEASURED 2026-08-10: the real id10 tag detected 30/30 at one spot with
+# sub-pixel scatter, but in 2 of those frames the mat ALSO hallucinated an
+# id10 elsewhere (the phantom vocabulary includes ids 7 and 10 — two ids that
+# are REAL tags on this table). detect_landmarks returns one position per id
+# per frame, so the phantom's position replaced the real one in those frames
+# and the pooled spread exploded to 279 px — a perfectly healthy landmark
+# read as a wanderer. Spread-over-everything conflates "one bad frame" with
+# "moving between frames"; the discriminator is whether a large CONSISTENT
+# cluster exists, so position voting is median-anchored with outliers
+# dropped. A true wanderer has no majority cluster and still fails.
+
+def _poisoned(n_good, n_poison, good=(105.0, 120.0), bad=(315.0, 210.0)):
+    return ([{10: good}] * n_good) + ([{10: bad}] * n_poison)
+
+
+def test_one_poisoned_frame_does_not_sink_an_observed_landmark():
+    """THE CASE: 28 frames at the tag, 2 frames captured the phantom."""
+    from b601.cameras.reference import observed_landmarks
+    out = observed_landmarks(_poisoned(10, 1))
+    assert out[10] == pytest.approx((105.0, 120.0))
+
+
+def test_one_poisoned_frame_does_not_sink_a_recorded_landmark():
+    """Recording demands presence in EVERY frame — and the id IS present in
+    every frame; it is one frame's POSITION that is the phantom's. Refusing
+    would make --record a retry-until-lucky loop on a healthy tag."""
+    from b601.cameras.reference import stable_landmarks
+    out = stable_landmarks(_poisoned(11, 1))
+    assert out[10] == pytest.approx((105.0, 120.0))
+
+
+def test_the_position_is_the_mean_of_the_inliers_not_of_everything():
+    from b601.cameras.reference import observed_landmarks
+    seq = [{10: (100.0, 100.0)}, {10: (101.0, 100.0)}, {10: (100.5, 100.0)},
+           {10: (400.0, 300.0)}, {10: (100.0, 100.0)}, {10: (100.5, 100.0)}]
+    x, y = observed_landmarks(seq)[10]
+    assert abs(x - 100.4) < 0.2 and abs(y - 100.0) < 0.1
+
+
+def test_a_wandering_phantom_still_has_no_majority_cluster():
+    """id 190's signature: many frames, a different place every time. Median
+    anchoring must not resurrect it."""
+    from b601.cameras.reference import observed_landmarks, stable_landmarks
+    seq = [{7: (100.0, 100.0)}, {7: (250.0, 180.0)}, {7: (400.0, 60.0)},
+           {7: (150.0, 300.0)}, {7: (320.0, 120.0)}, {7: (208.0, 90.0)}]
+    assert observed_landmarks(seq) == {}
+    assert stable_landmarks(seq) == {}
+
+
+def test_too_many_poisoned_frames_fail_the_strict_record_path():
+    """One bad frame is a phantom collision; several is a tag that cannot be
+    trusted as a reference. The record path stays strict."""
+    from b601.cameras.reference import stable_landmarks
+    assert stable_landmarks(_poisoned(8, 4)) == {}

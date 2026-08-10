@@ -301,13 +301,41 @@ def stable_landmarks(per_frame, max_jitter_px=DEFAULT_JITTER_PX):
 
     out = {}
     for i in sorted(common):
-        xs = [f[i][0] for f in frames]
-        ys = [f[i][1] for f in frames]
-        cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
-        spread = max(max(abs(x - cx) for x in xs), max(abs(y - cy) for y in ys))
-        if spread <= max_jitter_px:
-            out[i] = (cx, cy)
+        cluster = _consistent_cluster([f[i] for f in frames], max_jitter_px)
+        # Presence in every frame, and the consistent cluster may lose AT MOST
+        # one frame to a same-frame phantom collision — and only when the
+        # cluster alone still meets the stability minimum. MEASURED: the mat
+        # hallucinates ids that are REAL tags here (7, 10) in ~1-2 frames of
+        # 30, and detect_landmarks keeps one position per id per frame, so
+        # the phantom's position occasionally replaces the real one. Without
+        # this tolerance, --record is a retry-until-lucky loop on a healthy
+        # tag. More than one poisoned frame is a tag that cannot be trusted.
+        if cluster is not None and len(cluster[0]) >= max(
+                len(frames) - 1, MIN_STABILITY_FRAMES):
+            out[i] = cluster[1]
     return out
+
+
+def _consistent_cluster(positions, max_jitter_px):
+    """-> (inlier positions, their mean) anchored at the median, or None.
+
+    The median is the anchor because it is what one phantom-poisoned frame
+    cannot move; a mean anchor drifts toward the outlier and can disqualify
+    the true cluster. A wandering phantom has no majority around its median
+    and yields a cluster of one or two, which every caller's threshold
+    rejects.
+    """
+    xs = sorted(p[0] for p in positions)
+    ys = sorted(p[1] for p in positions)
+    mx, my = xs[len(xs) // 2], ys[len(ys) // 2]
+    inliers = [p for p in positions
+               if abs(p[0] - mx) <= max_jitter_px
+               and abs(p[1] - my) <= max_jitter_px]
+    if not inliers:
+        return None
+    cx = sum(p[0] for p in inliers) / len(inliers)
+    cy = sum(p[1] for p in inliers) / len(inliers)
+    return inliers, (cx, cy)
 
 
 def observed_landmarks(per_frame, max_jitter_px=DEFAULT_JITTER_PX):
@@ -342,14 +370,13 @@ def observed_landmarks(per_frame, max_jitter_px=DEFAULT_JITTER_PX):
     out = {}
     for i in sorted(ids):
         seen = [f[i] for f in frames if i in f]
-        if len(seen) * 2 <= len(frames):        # a majority, strictly
-            continue
-        xs = [p[0] for p in seen]
-        ys = [p[1] for p in seen]
-        cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
-        spread = max(max(abs(x - cx) for x in xs), max(abs(y - cy) for y in ys))
-        if spread <= max_jitter_px:
-            out[i] = (cx, cy)
+        cluster = _consistent_cluster(seen, max_jitter_px)
+        # The MAJORITY must be position-consistent, not merely present: a
+        # same-frame phantom collision (measured, ids 7 and 10) occasionally
+        # replaces the real position, so the vote counts the consistent
+        # cluster, anchored at the median where one bad frame cannot move it.
+        if cluster is not None and len(cluster[0]) * 2 > len(frames):
+            out[i] = cluster[1]
     return out
 
 
