@@ -41,7 +41,9 @@ set -euo pipefail
 REPO="${B601_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 CONDA_PY="${B601_PY:-/home/demo/miniforge3/envs/lerobot/bin/python}"
 CONDA_BIN="$(dirname "$CONDA_PY")"
-BACKUP="${B601_BACKUP:-/media/demo/b0b0d284-79d6-4291-93ad-f27ef2f77022/b601}"
+# /mnt/nvme3 is an fstab mount (UUID=b0b0d284…, nofail) since 2026-08-10 —
+# it survives reboots, unlike the udisks /media/demo path it replaces.
+BACKUP="${B601_BACKUP:-/mnt/nvme3/b601}"
 
 TASK="${1:-}"
 EPISODES="${2:-1}"

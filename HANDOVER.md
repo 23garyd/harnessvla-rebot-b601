@@ -38,12 +38,12 @@ vendor patches), RUNBOOK.md "one pipeline session per reset" item.
 ## EVERY MORNING — the power-up ritual (all of it recurs per boot)
 1. **Power the arm, bring up CAN** (needs sudo, password location is in the
    session memory): `sudo ip link set can0 up type can bitrate 1000000`
-2. **Mount the backup drive** (no sudo needed; udisks mounts do NOT survive
-   a reboot, and the record script's backup gate fails without it —
-   measured 2026-08-08, first thing it caught):
-   `udisksctl mount -b /dev/disk/by-uuid/b0b0d284-79d6-4291-93ad-f27ef2f77022`
-   By UUID, never by /dev/nvmeXn1pY — four identical OWC drives are
-   installed and the kernel demonstrably shuffles their numbering across
+2. **Backup drive mounts itself since 2026-08-10** — an fstab entry
+   (UUID=b0b0d284…, `nofail`) mounts it at **`/mnt/nvme3`** on every boot,
+   retiring the manual udisksctl step and the mount-missing morning failure
+   it existed for. Scripts point at `/mnt/nvme3/b601`. If the backup gate
+   ever fails again, check `findmnt /mnt/nvme3` first — and mount by UUID,
+   never /dev/nvmeXn1pY: four identical OWC drives shuffle numbering across
    reboots.
 3. **Park the arm in its session-start pose** — the drift reference was
    recorded with it there, clear of every marker sightline. (2026-08-08: the
@@ -114,7 +114,7 @@ repository.
   one-session-per-reset behaviour smells like a known-fixed defect; updating
   would remove the reset workaround but carries a small brick risk and
   changes pinned hardware state (owner call)
-- **Backup is on-machine only** — `/media/demo/b0b0d284.../b601` is a second
+- **Backup is on-machine only** — `/mnt/nvme3/b601` is a second
   internal NVMe: protects against disk failure, not machine loss. The risk
   as written says OFF-machine
 - **Staging method** (metric transform vs image-space) — decide before

@@ -75,13 +75,15 @@ reserved zone above, frozen before the first episode.
 - Backup from the first pilot episode
 - Excluded episodes are quarantined with a reason, never deleted
 
-## Backup target (chosen 2026-08-06)
+## Backup target (chosen 2026-08-06; mount path changed 2026-08-10)
 
-    /media/demo/b0b0d284-79d6-4291-93ad-f27ef2f77022/b601
+    /mnt/nvme3/b601        (UUID=b0b0d284-79d6-4291-93ad-f27ef2f77022)
 
-Verified a separate physical device from the repo disk: `/dev/nvme3n1p1`
-(OWC Aura P12 Pro 4 TB, 3.3 TB free, ext4) against `/dev/nvme4n1p2`. Capacity
-is not a constraint.
+Verified a separate physical device from the repo disk (OWC Aura P12 Pro
+4 TB, 3.3 TB free, ext4) against `/dev/nvme4n1p2`. Capacity is not a
+constraint. Since 2026-08-10 an fstab entry (`nofail`) mounts it at boot,
+replacing the transient udisks mount at `/media/demo/<uuid>` whose absence
+after every reboot kept failing the record script's backup gate.
 
 **It is not off-machine, and the risk log says off-machine.** A second internal
 NVMe covers disk failure, which is the most likely loss, but not machine loss,
@@ -90,9 +92,7 @@ accepted gap rather than a satisfied requirement. A truly off-machine copy of
 the accepted episodes remains worth doing before Day 10.
 
 **Writable since 2026-08-07** (`demo:demo` on the `b601` directory), and the
-first pilot episode's backup landed there 2026-08-08. Two operational notes:
-the udisks mount does NOT survive a reboot — the record script's backup gate
-caught exactly that on the first post-reboot attempt; the morning ritual in
-`HANDOVER.md` now includes `udisksctl mount -b /dev/disk/by-uuid/b0b0d284-…`
-— and mount by UUID only: four identical OWC drives are installed and the
-kernel demonstrably shuffles their `/dev/nvmeX` numbering across reboots.
+first pilot episode's backup landed there 2026-08-08. Mount by UUID only:
+four identical OWC drives are installed and the kernel demonstrably shuffles
+their `/dev/nvmeX` numbering across reboots — which is also why the fstab
+entry pins the UUID, not a device name.
