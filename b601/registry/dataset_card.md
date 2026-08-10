@@ -36,10 +36,39 @@ under what physical configuration, and what was excluded.
 - Objects, workspace regions, and the variation matrix cell each episode fills
 - Episode count: attempted / accepted / excluded, **with the exclusion reason**
 
+## Training corpus: `local/b601_train` — design frozen 2026-08-10, BEFORE episode 1
+
+- **Task**: "pick up the red block and place it in the bowl" — identical
+  string to the pilot. ONE red block; colour variation deliberately rejected
+  (the thesis is planner-vs-primitive, not perception generality — extra
+  colours split the episode budget across appearances and confound the
+  Day-18 comparison). Saucer FIXED at its witness-marked position (a moving
+  place-target makes a failed place ambiguous evidence: bad grasp or bad
+  place?).
+- **Placement policy**: free scatter — the operator starts the block
+  anywhere comfortably reachable, no grid schedule. Two guards replace the
+  grid: the reserved zone below, and an automated per-session coverage audit
+  (frame 0 of every episode; red-blob centroid on the green mat; build the
+  placement map; flag clustering and under-covered areas for the next
+  session).
+- **HELD-OUT ZONE (frozen)**: image-space rectangle **(150, 230)–(270, 350)**
+  in the agentview frame under calibration `f31fe…`-current (the drift gate
+  holds the camera fixed, so image coordinates are durable). The block never
+  STARTS there during collection; Day-14 evaluation places it there. Diagram:
+  `b601/registry/b601_train_zones.jpg`. Leakage audit = frame-0
+  centroid inside the rectangle.
+- **Target**: **150 accepted episodes** (plan budget 120–200), collected over
+  3–5 sessions. Exclusions are quarantined with a reason, never deleted.
+- **Session ritual**: HANDOVER.md morning ritual, saucer on its witness mark,
+  identical room lighting to the exposure measurement (both cameras run
+  fixed exposure), consistent demonstration strategy (same approach
+  direction, same top-down grasp).
+
 ## Frozen split
 Held-out evaluation placements are chosen **before** training and never
 appear in the training set. Leakage is checked automatically at the Day-10
-gate, not asserted by hand.
+gate, not asserted by hand. For `b601_train` the held-out set is the
+reserved zone above, frozen before the first episode.
 
 ## Integrity
 - `datasets/` is gitignored; the dataset **hash is committed here**
