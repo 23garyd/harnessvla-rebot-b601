@@ -78,7 +78,22 @@ a frozen pre-deletion snapshot: **`/mnt/nvme3/b601/b601_train_full_20260810`**
 (52 episodes). The working dataset renumbered: old 38–41 → 37–40, old
 46–51 → **41–46**.
 
-**Documented anomaly, episodes 41–46 (new numbering; kept):** same
+**Session 3 (2026-08-10) ended by GRIPPER FAILURE — 4 more episodes removed
+by owner decision** (pre-deletion snapshot: `b601_train_full_20260810b`, 51
+episodes). The end-position audit showed the failure began EARLIER than it
+was noticed: the last episode of session 2 (then-46) already failed delivery
+(block ended 78 px from the saucer), then 105 px and 147 px on the next two
+— a worsening drop pattern — before one clean success and a final episode
+that started in the goal state. Removed: then-46/47/48/50. Kept: the mid-
+failure success (now episode 46) — it starts at a legitimate mat position,
+completes the task, and any regrasp it contains is naturalistic recovery
+data. The saucer was verified NOT to have moved (fixed at its mark, ±2 px,
+throughout). **Collection is paused until the gripper is repaired; after
+repair, record 2–3 verification episodes and replay them before resuming
+scaled collection. A repaired-in-kind gripper is a registry note; a
+REPLACED gripper model is an experiment-version event.**
+
+**Documented anomaly, episodes 41–45 (new numbering; kept):** same
 reset-inside-recording pattern in light form — ~2–3 s prefixes (block in
 saucer, hand repositioning it, arm parked and idle). Kept because the bulk
 of each episode is a valid demonstration and the prefix states (hand in
