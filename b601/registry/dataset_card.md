@@ -64,6 +64,12 @@ under what physical configuration, and what was excluded.
   fixed exposure), consistent demonstration strategy (same approach
   direction, same top-down grasp).
 
+### Quarantined episodes (excluded from training via `dataset.episodes`, never deleted)
+
+| Episode | Reason |
+|---|---|
+| 37 | Keyboard failed mid-demonstration 2026-08-10: no way to end the episode, so it ran to the full 60 s timeout (1796 frames vs the ~500–800 typical) with an unattended tail. The next attempt ("episode 38" on the console) was still in progress when the session stopped and was never saved. |
+
 ## Frozen split
 Held-out evaluation placements are chosen **before** training and never
 appear in the training set. Leakage is checked automatically at the Day-10
