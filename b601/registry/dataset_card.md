@@ -69,6 +69,18 @@ under what physical configuration, and what was excluded.
 | Episode | Reason |
 |---|---|
 | 37 | Keyboard failed mid-demonstration 2026-08-10: no way to end the episode, so it ran to the full 60 s timeout (1796 frames vs the ~500–800 typical) with an unattended tail. The next attempt ("episode 38" on the console) was still in progress when the session stopped and was never saved. |
+| 42–45 | Reset-inside-recording, heavy form (found by the frame-0 audit 2026-08-10): the operator pressed → twice (end episode + skip reset) and restaged the scene DURING the next episode. These four carry 5–8 s contaminated prefixes — a third of each episode: block starting in the saucer (the goal state), the arm returning from the previous place, a hand in frame moving the block. That is reverse-task motion under the task label. |
+
+**Documented anomaly, episodes 46–51 (kept):** same reset-inside-recording
+pattern in light form — ~2–3 s prefixes (block in saucer, hand repositioning
+it, arm parked and idle). Kept because the bulk of each episode is a valid
+demonstration and the prefix states (hand in frame, block in goal) cannot
+occur at deployment; their true start positions were recovered from
+post-reset frames for the coverage audit. If the Day-14 policy
+underperforms, these six are the first candidates to drop. **Corrected
+session rhythm from session 3 on:** during the reset window, FIRST park the
+arm clear, THEN restage the block, THEN press → — never reset after the
+next episode has begun.
 
 ## Frozen split
 Held-out evaluation placements are chosen **before** training and never
