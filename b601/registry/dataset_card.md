@@ -151,6 +151,28 @@ within 14 px of witness ALL session, gripper delivering, starts followed the
 focus zones (D and E filled), heads clean — the demonstrations themselves
 are good; only the boundary placement is broken.
 
+## REVALIDATION 2026-08-12 — supersedes every session-4–6 verdict above
+
+The orphan-row root cause (risk log 2026-08-12) invalidated all audits of
+episodes ≥38 since session 2. After the surgical repair (orphan block
+removed; rows==meta==videos verified) the full corpus was re-audited on the
+TRUE map with corrected instruments (final-frame decode walk-back; splice
+threshold calibrated; end position measured against the drift-verified
+witness mark, because a placed block hides the saucer from the blue
+detector — the success state blinded the success check).
+
+**Result: 66 of 73 GOOD.** Removed: 24, 49, 50 (failed deliveries), 58, 69
+(spliced trim products — cuts computed on the broken map), 59 (splice +
+head contact), 71 (bad end). Repaired-state snapshot:
+`b601_train_repaired_20260812`. Post-delete alignment guard: 0 mismapped,
+0 bad frame sequences.
+
+**Corpus: 66 episodes, 39,390 frames — every one verified on a validated
+index map.** The operator's session-6 testimony was correct throughout;
+the recording workflow needs no change beyond what the voice cues already
+provide. Historical verdicts above are retained for the audit trail but are
+NOT the record of what the corpus contains — this section is.
+
 **Documented anomaly, episodes 41–45 (new numbering; kept):** same
 reset-inside-recording pattern in light form — ~2–3 s prefixes (block in
 saucer, hand repositioning it, arm parked and idle). Kept because the bulk
