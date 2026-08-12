@@ -131,10 +131,14 @@ seconds — head contamination is the one unrepairable class.
 an operator problem.** The operator deliberately waited 5 s after hearing
 "Reset the environment" before touching the block — and the reset still
 landed inside episodes. Episode boundaries land one phase late: each episode
-records [demo -> return-home -> hand-reset], meaning the -> press at
-return-home is not reaching the recorder when pressed ("recording does not
-stop after I hit the right arrow" — operator report, corroborated by the
-ep81 filmstrip). Session is X11 (Wayland capture theory excluded); spd-say
+records [demo -> return-home -> hand-reset], meaning the episode boundary lands after the
+hand-reset instead of at the press ("recording does not stop after I hit
+the right arrow" — operator report, corroborated by the ep81 filmstrip).
+CORRECTION 2026-08-12: the operator also reports the console prints AND
+speaks "Reset the environment" on EVERY press — so the press does reach
+the process, which contradicts the input-path framing. The mechanism by
+which announced-and-acknowledged presses still yield shifted boundaries
+is UNRESOLVED; the operator declined a live listener test. Session is X11 (Wayland capture theory excluded); spd-say
 messages queue (~2 s lag measured) but cannot explain a 5 s gap. Keypress
 event path (keyboard hardware / pynput listener) under live test. Salvage
 per the standing trim protocol, upgraded to cut at ARM-IDLE-after-placement
