@@ -127,6 +127,26 @@ protocol: press → at delivery when possible; tails are trimmed as a
 standard post-session step; NEVER touch the block in a recording's first
 seconds — head contamination is the one unrepairable class.
 
+**Session 6 (2026-08-12): boundary shift confirmed as an INPUT problem, not
+an operator problem.** The operator deliberately waited 5 s after hearing
+"Reset the environment" before touching the block — and the reset still
+landed inside episodes. Episode boundaries land one phase late: each episode
+records [demo -> return-home -> hand-reset], meaning the -> press at
+return-home is not reaching the recorder when pressed ("recording does not
+stop after I hit the right arrow" — operator report, corroborated by the
+ep81 filmstrip). Session is X11 (Wayland capture theory excluded); spd-say
+messages queue (~2 s lag measured) but cannot explain a 5 s gap. Keypress
+event path (keyboard hardware / pynput listener) under live test. Salvage
+per the standing trim protocol, upgraded to cut at ARM-IDLE-after-placement
+(keeps the operator's return-home, the ideal terminal shape): 20 recorded ->
+5 kept as-is + 8 trimmed, of which 3 discarded as fly-over cuts and 1
+fail-closed (wrist view off-table at cut). Yield 9 of 20. All ends verified
+(one via wrist camera). Snapshot: `b601_train_full_20260812` (84 episodes).
+**Corpus: 73 episodes, 42,785 frames.** Also verified this session: saucer
+within 14 px of witness ALL session, gripper delivering, starts followed the
+focus zones (D and E filled), heads clean — the demonstrations themselves
+are good; only the boundary placement is broken.
+
 **Documented anomaly, episodes 41–45 (new numbering; kept):** same
 reset-inside-recording pattern in light form — ~2–3 s prefixes (block in
 saucer, hand repositioning it, arm parked and idle). Kept because the bulk
