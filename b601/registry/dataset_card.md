@@ -111,6 +111,22 @@ measured); LeRobotDataset.create requires robot_type and an explicit
 .finalize() — omitting finalize truncates the episodes parquet.
 **Corpus after surgery: 52 episodes, 32,240 frames, zero held-out leakage.**
 
+**Session 5 (2026-08-11): the trim pipeline is now routine.** 20 recorded;
+the correct rhythm held for seven mid-session episodes (ends 3–28 px from
+the saucer) and reverted around it — a fatigue pattern, not a knowledge gap.
+Handling per the session-4 protocol: 6 kept untouched, 3 dropped for
+poisoned heads (fail closed), 11 tail-trimmed at last saucer arrival
+(+2 s margin, raised after session 4's fly-over lesson), of which 1 had no
+clean arrival and 4 were discarded post-merge on visual end-verification
+(the "last arrival" was the un-place carry passing back over the saucer —
+release detection would be needed to do better, not worth it). One end
+verified via the wrist camera (occluded from above, block seated). Yield:
+12 of 20. Snapshot: `b601_train_full_20260811b` (72 episodes).
+**Corpus: 64 episodes, 38,094 frames, zero held-out leakage.** Standing
+protocol: press → at delivery when possible; tails are trimmed as a
+standard post-session step; NEVER touch the block in a recording's first
+seconds — head contamination is the one unrepairable class.
+
 **Documented anomaly, episodes 41–45 (new numbering; kept):** same
 reset-inside-recording pattern in light form — ~2–3 s prefixes (block in
 saucer, hand repositioning it, arm parked and idle). Kept because the bulk
