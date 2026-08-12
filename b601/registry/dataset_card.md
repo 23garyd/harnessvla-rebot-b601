@@ -93,6 +93,24 @@ repair, record 2–3 verification episodes and replay them before resuming
 scaled collection. A repaired-in-kind gripper is a registry note; a
 REPLACED gripper model is an experiment-version event.**
 
+**Session 4 (2026-08-11): reset-recorded-through-the-arm — 8 of 27 episodes
+salvaged by frame-level trimming.** The operator pressed → and then reset via
+the leader, but dropped keypresses (the failing keyboard's third incident)
+and reset-window skips put the arm-driven un-place INSIDE recordings — the
+worst contamination class, since "block in saucer → retrieve it" is
+on-distribution at deployment and would undo the harness's verified
+successes. Handling: per-episode cut points at the last block-arrival at the
+saucer (+1.5 s); heads screened the same way (an un-place PREFIX is equally
+poisonous — 8 of 16 candidates failed head screening, fully-occluded heads
+failing closed); three trims discarded post-merge when their final frames
+showed a fly-over cut (block beside the saucer or still gripped). Yield: 8
+clean trimmed episodes merged back; 19 of session 4 deleted. Pre-surgery
+snapshot: `b601_train_full_20260811` (74 episodes). Trim tooling notes: the
+in-place delete mode of lerobot-edit-dataset corrupts its source (bug,
+measured); LeRobotDataset.create requires robot_type and an explicit
+.finalize() — omitting finalize truncates the episodes parquet.
+**Corpus after surgery: 52 episodes, 32,240 frames, zero held-out leakage.**
+
 **Documented anomaly, episodes 41–45 (new numbering; kept):** same
 reset-inside-recording pattern in light form — ~2–3 s prefixes (block in
 saucer, hand repositioning it, arm parked and idle). Kept because the bulk
