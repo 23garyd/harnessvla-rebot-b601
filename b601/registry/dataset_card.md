@@ -11,6 +11,18 @@ from two flawless post-repair sessions. Final snapshot:
 and F (far-left, 3) remain thin — top-up candidates if Day-14 evaluation
 shows position-dependent weakness; not blockers.
 
+**Merge-damage caveat (2026-08-12 evening):** the final three-way merge
+mis-assembled ONE video file (`file-008`): its four episodes (46, 48–50)
+passed revalidation before the merge and fail endpoint verification
+after — the other 164 verify clean (three files carry trailing surplus
+frames after their last mapped episode; measured harmless). v1 training
+runs on the 164 via `dataset.episodes` exclusion with `tolerance_s=0.04`
+(one frame), NO further surgery — the merge tool's video copy is the
+suspected culprit and is not being handed the corpus again until its
+bug is found. The four originals are intact in
+`b601_train_repaired_20260812`. Two decode-path vendor bugs were fixed
+en route (frame-index clamp; see protocol_deviations fourth patch).
+
 ## Pilot: `local/b601_pilot` (Day-5 gate evidence)
 
 **12 episodes, 7031 frames @ 30 fps** as of 2026-08-08 evening, both camera
