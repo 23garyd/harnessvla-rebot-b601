@@ -57,6 +57,9 @@ echo "=== EVALUATION: policy drives, you score. E-STOP IN REACH. ==="
 echo "  policy   : $POLICY"
 echo "  trials   : $TRIALS   cap ${EVAL_TIME_S}s each"
 echo "  keys     : RIGHT = end trial (score it), ESC = abort session"
+echo "  reset    : teleop is LIVE during reset windows — re-park the arm at"
+echo "             the TRAINING START POSE before every trial, then restage"
+echo "             the block. The policy never saw any other start pose."
 echo
 
 PYTHONNOUSERSITE=1 "$CONDA_BIN/lerobot-record" \
@@ -64,6 +67,9 @@ PYTHONNOUSERSITE=1 "$CONDA_BIN/lerobot-record" \
     --robot.port=can0 \
     --robot.id=follower1 \
     --robot.cameras="$CAMERAS" \
+    --teleop.type=rebot_arm_102_leader \
+    --teleop.port=/dev/ttyUSB0 \
+    --teleop.id=rebot_arm_102_leader \
     --policy.path="$POLICY" \
     --dataset.repo_id="local/$DATASET_ID" \
     --dataset.root="$DATASET_ROOT" \
