@@ -18,7 +18,7 @@ EVAL_TIME_S="${B601_EVAL_TIME_S:-40}"
 TRIALS="${1:-}"
 [ -n "$TRIALS" ] || { echo "usage: eval_session.sh <num_trials> [extra lerobot args]" >&2; exit 64; }
 
-DATASET_ID="${B601_DATASET_ID:-b601_eval_v1}"
+DATASET_ID="${B601_DATASET_ID:-eval_b601_v1}"
 DATASET_ROOT="${B601_DATASET_ROOT:-$REPO/datasets/$DATASET_ID}"
 
 fail() { echo "GATE FAILED: $*" >&2; exit 1; }
