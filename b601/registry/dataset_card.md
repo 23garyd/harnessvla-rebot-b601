@@ -1,7 +1,15 @@
 # Dataset card — B601 demonstration set
 
-**Status: pilot in progress.** First episode recorded 2026-08-08; the full
-set is populated during Week 2 (plan Days 6–10).
+**Status: COLLECTION TARGET EXCEEDED — 168 verified episodes (target 150),
+96,058 frames, certified 2026-08-12.** Every episode passed the behavioral
+audit on a validated index map (alignment guard + two-point uniqueness +
+decode checks); zero held-out leakage across all 168 starts. Composition:
+66 revalidated survivors + 62 reclaimed originals (the orphan-row saga's
+false discards, incl. one recovered from a fingerprint false-match) + 40
+from two flawless post-repair sessions. Final snapshot:
+`b601_train_final168_20260812`. Coverage note: zones D (saucer rim, 2)
+and F (far-left, 3) remain thin — top-up candidates if Day-14 evaluation
+shows position-dependent weakness; not blockers.
 
 ## Pilot: `local/b601_pilot` (Day-5 gate evidence)
 
