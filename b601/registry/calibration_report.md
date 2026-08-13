@@ -77,6 +77,37 @@ twice did, correctly. Verified: three consecutive preflights, 4/4 landmarks,
 0.29–0.31 px median. The tag-quality work was still right — it moved tags
 from 53–67% presence (junk, correctly excluded) to 70–100% (healthy).
 
+## STAGING METHOD DECIDED 2026-08-12: image-space (owner decision)
+
+The plan permits either a camera-to-robot metric transform or a documented
+image-space method and requires recording which and why. **Chosen:
+image-space staging.** The planner perceives the block as a pixel position
+in the drift-gated agentview frame and maps it to a joint-space pre-grasp
+pose via a staging table (derivable from the 168-episode corpus itself:
+every episode pairs a start pixel with the demonstrated approach's early
+joint poses; a ~20-sample teleop table is the fallback).
+
+Why, in order of weight:
+1. **Fidelity to the harness concept**: the primitive is an image-conditioned
+   black box; staging, invocation and verification all live in observation
+   space. A metric frame is an intermediate the loop never consumes.
+2. **The Day-18 comparison cannot afford a transform confound**: a systematic
+   extrinsic bias stages consistently wrong and reads as policy failure —
+   the sim track's Object-S failure shape, the exact class this registry
+   exists to prevent.
+3. **It reopens nothing**: metric staging would resurrect the powered-motion
+   blocker chain (FK-vs-arm validation, acceleration cap, vendor envelope)
+   plus webcam intrinsics + hand-eye calibration and their validation.
+4. **Schedule**: buildable in a day from battle-tested parts (the audit's
+   blob detector, the drift gate, the corpus). Metric costs days before the
+   first staged grasp.
+
+What this forecloses (recorded, reversible): staging poses do not survive a
+deliberate camera move (the camera is pinned experiment state with a drift
+gate — a move is an experiment-version bump regardless); metric extensions
+(e.g. wrist-depth refinement) remain available as stretch work now that the
+D405 sits on USB 3.
+
 ## The method, and why
 
 The plan permits either a camera-to-robot transform or a documented
