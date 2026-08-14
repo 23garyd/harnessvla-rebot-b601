@@ -62,11 +62,17 @@ echo "             the TRAINING START POSE before every trial, then restage"
 echo "             the block. The policy never saw any other start pose."
 echo
 
+# Command-stream rate limits (per-tick, from the demonstrated envelope,
+# p99.9 + ~30%): applied by the fork to POLICY actions against the previous
+# command — same frame by construction. The follower's own
+# max_relative_target is NOT used: it compares calibrated goals to raw motor
+# readings and treats a failed state read as position 0 (measured causing a
+# table press and jerk-stop motion).
+export B601_MAX_ACTION_DELTA='{"shoulder_pan": 3.2, "shoulder_lift": 3.4, "elbow_flex": 2.8, "wrist_flex": 2.3, "wrist_yaw": 1.7, "wrist_roll": 2.2, "gripper": 9.0}'
 PYTHONNOUSERSITE=1 "$CONDA_BIN/lerobot-record" \
     --robot.type=seeed_b601_rs_follower \
     --robot.port=can0 \
     --robot.id=follower1 \
-    --robot.max_relative_target='{"shoulder_pan": 3.2, "shoulder_lift": 3.4, "elbow_flex": 2.8, "wrist_flex": 2.3, "wrist_yaw": 1.7, "wrist_roll": 2.2, "gripper": 9.0}' \
     --robot.cameras="$CAMERAS" \
     --teleop.type=rebot_arm_102_leader \
     --teleop.port=/dev/ttyUSB0 \
