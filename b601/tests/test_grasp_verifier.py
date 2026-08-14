@@ -113,3 +113,12 @@ class TestConfig:
         p.write_text(json.dumps(CONFIG))
         v = GraspVerifier.load(str(p)).verify(frame((300, 480), (150, 500)), HOLD)
         assert v.held is True
+
+    def test_pinned_artifact_loads_and_works(self):
+        # the committed config must construct a working verifier: a clearly
+        # held frame at the corpus median hold value says yes, home says no
+        import pathlib
+        root = pathlib.Path(__file__).resolve().parents[2]
+        v = GraspVerifier.load(str(root / "b601" / "setup" / "grasp_verifier.json"))
+        assert v.verify(frame((300, 480), (150, 500)), 152.0).held is True
+        assert v.verify(frame(), 2.0).held is False

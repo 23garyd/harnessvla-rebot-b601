@@ -12,8 +12,22 @@ Two independent cues, ANDed — both must say yes:
 
 Fail-closed by construction: a bad frame, a missing gripper reading or any
 internal doubt is a NO with a reason — never an exception mid-harness and
-never a YES. Thresholds live in a JSON config artifact so they are pinned
-experiment state, not code.
+never a YES. Thresholds live in a JSON config artifact
+(`b601/setup/grasp_verifier.json`) so they are pinned experiment state,
+not code.
+
+WHAT THIS DOES NOT COVER (measured, eval eps 21/29): a wrist hovering LOW
+beside an un-grasped table block with a partially-closed gripper satisfies
+BOTH cues persistently — the block fills the bottom of the frame from
+proximity, and the commanded half-closed gripper sits inside the hold band.
+The harness must therefore LIFT TO THE VERIFY POSE before asking; this
+function cannot know where the arm is. From the lifted pose the two cases
+separate by 5x (table block bottom-strip p95 0.073 vs held p5 0.362).
+
+Calibration on the corpus (v4 anchors): 416/417 hold frames verified held;
+0/168 false holds at home; 0/168 with the open gripper AT the block (the
+gripper cue's job); 5/139 during the post-release band transit, which a
+stationary verify pose does not exhibit.
 """
 from __future__ import annotations
 
