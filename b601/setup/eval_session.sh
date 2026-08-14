@@ -66,6 +66,7 @@ PYTHONNOUSERSITE=1 "$CONDA_BIN/lerobot-record" \
     --robot.type=seeed_b601_rs_follower \
     --robot.port=can0 \
     --robot.id=follower1 \
+    --robot.max_relative_target=1.9 \
     --robot.cameras="$CAMERAS" \
     --teleop.type=rebot_arm_102_leader \
     --teleop.port=/dev/ttyUSB0 \
