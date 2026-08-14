@@ -57,6 +57,8 @@ echo "=== EVALUATION: policy drives, you score. E-STOP IN REACH. ==="
 echo "  policy   : $POLICY"
 echo "  trials   : $TRIALS   cap ${EVAL_TIME_S}s each"
 echo "  keys     : RIGHT = end trial (score it), ESC = abort session"
+echo "  IMPORTANT: trials NEVER auto-start — the reset window waits until"
+echo "             you press RIGHT. Park, stage, hands clear, THEN press."
 echo "  reset    : teleop is LIVE during reset windows — re-park the arm at"
 echo "             the TRAINING START POSE before every trial, then restage"
 echo "             the block. The policy never saw any other start pose."
@@ -84,7 +86,7 @@ PYTHONNOUSERSITE=1 "$CONDA_BIN/lerobot-record" \
     --dataset.num_episodes="$TRIALS" \
     --dataset.fps=30 \
     --dataset.episode_time_s="$EVAL_TIME_S" \
-    --dataset.reset_time_s=30 \
+    --dataset.reset_time_s=3600 \
     --dataset.push_to_hub=false \
     --display_data=false \
     "${RESUME_ARGS[@]}" "${@:2}"
