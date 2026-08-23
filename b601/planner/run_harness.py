@@ -126,22 +126,25 @@ class FakeRobot:
 
 
 def make_real_robot(cfg):
-    import subprocess
     from lerobot.robots.utils import make_robot_from_config
     from lerobot.utils.import_utils import register_third_party_plugins
     register_third_party_plugins()
     from lerobot_robot_seeed_b601.config_seeed_b601_rs_follower import (
         SeeedB601RSFollowerConfig,
     )
-    from lerobot.cameras.utils import make_cameras_from_configs  # noqa: F401
-    cameras_json = subprocess.run(
-        ["python", "-m", "b601.cameras.lerobot_config"],
-        capture_output=True, text=True, check=True, cwd=str(REPO),
-    ).stdout.strip()
+    from b601.cameras.config import load_cameras
+    from b601.cameras.lerobot_config import cameras_arg
     import draccus
     from lerobot.cameras import CameraConfig
+    # importing registers the CameraConfig subclasses draccus decodes to
+    from lerobot.cameras.opencv.configuration_opencv import (  # noqa: F401
+        OpenCVCameraConfig,
+    )
+    from lerobot.cameras.realsense.configuration_realsense import (  # noqa: F401
+        RealSenseD405ColorCameraConfig,
+    )
     cam_cfgs = {}
-    for name, cc in json.loads(cameras_json).items():
+    for name, cc in cameras_arg(load_cameras()).items():
         cam_cfgs[name] = draccus.decode(CameraConfig, cc)
     robot_cfg = SeeedB601RSFollowerConfig(
         port="can0", id="follower1", cameras=cam_cfgs)
