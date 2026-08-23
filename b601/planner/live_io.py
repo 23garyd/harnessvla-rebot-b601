@@ -143,6 +143,35 @@ class LiveIO:
             if rest > 0:
                 self._sleep(rest)
 
+    def _open_gripper_and_wait(self, phase):
+        """Open the gripper IN PLACE and wait until it is physically open.
+
+        The gripper lags every arm joint, and staging is otherwise open-loop:
+        without this, the arm arrives at the cube while the fingers are still
+        opening and the closed gripper plows into it (measured, shakedown-3;
+        same lag that mis-staged the gripper state in shakedown-1)."""
+        self._phase = phase
+        open_state = float(self._cfg["gripper_open_state"])
+        min_state = float(self._cfg.get("gripper_open_min_state", 240.0))
+        deadline = self._clock() + float(self._cfg.get("gripper_wait_max_s", 3.0))
+        while True:
+            obs = self._obs()
+            state = self._state_vec(obs)
+            if state[6] >= min_state:
+                return
+            if self._clock() > deadline:
+                raise HarnessAbort(
+                    f"gripper failed to open ({state[6]:.0f} < {min_state:.0f}"
+                    f") within the wait budget during {phase}")
+            t0 = self._clock()
+            target = self._sam.to_action(state)
+            target[6] = self._sam.to_action(
+                np.concatenate([state[:6], [open_state]]))[6]
+            self._send(target)
+            rest = self._dt - (self._clock() - t0)
+            if rest > 0:
+                self._sleep(rest)
+
     # -- harness io contract ---------------------------------------------
     def perceive_block(self):
         return perception.block_pixel(self._obs().get("agentview"))
@@ -154,6 +183,10 @@ class LiveIO:
         return frac >= s["red_fraction_threshold"]
 
     def stage(self, pose):
+        # gripper first, arm second: never approach the cube with closed
+        # fingers (the staged pose's own gripper value is open by
+        # construction, but the physical gripper must CONFIRM before moving)
+        self._open_gripper_and_wait("stage_open")
         self._move_to_state_pose(pose, "stage")
 
     def invoke_policy(self):
@@ -181,10 +214,9 @@ class LiveIO:
     def place_recover(self):
         self._move_to_state_pose(self._cfg["poses_state_space"]["place"],
                                  "place_recover")
-        # open the gripper in place: same pose, gripper to open
-        release = list(self._cfg["poses_state_space"]["place"])
-        release[6] = self._cfg["gripper_open_state"]
-        self._move_to_state_pose(release, "release")
+        # release closed-loop: wait until the gripper has PHYSICALLY opened
+        # (the block must actually leave the fingers before the lift)
+        self._open_gripper_and_wait("release")
         self._sleep(0.5)
 
     def go_home(self):
