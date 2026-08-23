@@ -174,6 +174,8 @@ def main():
         cfg["policy_seconds_per_attempt"] = args.policy_seconds
 
     table = StagingTable.load(str(REPO / "b601" / "setup" / "staging_table.json"))
+    deep_path = REPO / "b601" / "setup" / "staging_table_deep.json"
+    deep_table = StagingTable.load(str(deep_path)) if deep_path.exists() else None
     verifier = GraspVerifier.load(str(REPO / "b601" / "setup" / "grasp_verifier.json"))
     policy = PolicyStepper(args.policy)
     print("policy loaded")
@@ -184,7 +186,8 @@ def main():
     recorder = TickRecorder(out_dir, cfg["fps"])
     io = LiveIO(robot, policy, cfg, verifier, recorder)
     harness = Harness(table, io, verify_burst=cfg["verify_burst"],
-                      verify_majority=cfg["verify_majority"])
+                      verify_majority=cfg["verify_majority"],
+                      deep_table=deep_table)
 
     results = []
     for trial in range(1, args.trials + 1):

@@ -73,7 +73,7 @@ def grasp_anchor(grip):
         run = 0
     return None, start
 
-points, poses, epids, skipped = [], [], [], []
+points, poses, poses_deep, epids, skipped = [], [], [], [], []
 holds = []
 for ep in range(n):
     a, b = int(eps["dataset_from_index"][ep]), int(eps["dataset_to_index"][ep])
@@ -94,6 +94,7 @@ for ep in range(n):
     stage_i = max(0, t_grasp - K_BEFORE)
     points.append((float(p[0]), float(p[1])))
     poses.append([float(v) for v in states[a + stage_i]])
+    poses_deep.append([float(v) for v in states[a + t_grasp]])
     epids.append((ep, t_grasp))
     if (ep + 1) % 40 == 0:
         print(f"...{ep + 1}/{n}", flush=True)
@@ -153,6 +154,17 @@ for i, (hx, hy) in enumerate([(180, 260), (240, 260), (210, 295), (180, 330), (2
         print(f"  H{i}: REFUSED {e}")
 table.write("/home/demo/Public/harnessvla-rebot-b601/b601/setup/staging_table.json")
 print("TABLE v4 WRITTEN")
+
+# DEEP table: pose AT closure onset (k=0), for retry attempts — after a
+# near-miss the retry stages with the fingers essentially at the block,
+# leaving the policy minimal room to drift (probes: the policy continues
+# from every funnel depth). Same kept episodes, same neutral roll.
+ps_deep = [list(poses_deep[i]) for i in keep]
+for p in ps_deep:
+    p[ROLL_DIM] = roll_neutral
+StagingTable.fit(pts, ps_deep).write(
+    "/home/demo/Public/harnessvla-rebot-b601/b601/setup/staging_table_deep.json")
+print("DEEP TABLE WRITTEN")
 
 # visual spot-check: wrist view at the new anchor should show the block
 # between the open fingers, directly below

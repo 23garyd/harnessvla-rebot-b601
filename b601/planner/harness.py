@@ -58,10 +58,14 @@ class TrialResult:
 
 class Harness:
     def __init__(self, table, io, max_attempts=3, verify_burst=5,
-                 verify_majority=3):
+                 verify_majority=3, deep_table=None):
         if not 0 < verify_majority <= verify_burst:
             raise ValueError("verify_majority must be in (0, verify_burst]")
         self._table = table
+        # retries stage from the AT-CLOSURE table when one is provided: after
+        # a near-miss the policy gets the block practically in its fingers
+        # (it is near-deterministic, so an identical retry repeats the miss)
+        self._deep_table = deep_table
         self._io = io
         self._max_attempts = int(max_attempts)
         self._burst = int(verify_burst)
@@ -94,8 +98,10 @@ class Harness:
                                         "block in saucer (not on mat)")
                 return self._finish("gave_up", attempts,
                                     "block not found on the mat")
+            table = self._table if (i == 1 or self._deep_table is None) \
+                else self._deep_table
             try:
-                pose, dist = self._table.query(pixel[0], pixel[1])
+                pose, dist = table.query(pixel[0], pixel[1])
             except StagingError as exc:
                 return self._finish("refused", attempts,
                                     f"staging refused: {exc}")

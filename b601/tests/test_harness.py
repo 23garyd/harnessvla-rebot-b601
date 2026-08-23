@@ -170,6 +170,41 @@ class TestFailClosed:
         assert "place_recover" not in io.log
 
 
+class TestDeepRetry:
+    def test_retries_stage_from_deep_table(self):
+        # attempt 1 uses the normal table; attempts 2+ stage DEEPER (at-closure
+        # poses) — a near-miss retry should leave the policy no room to drift
+        deep = StagingTable.fit(
+            [(100, 100), (500, 100), (100, 400), (500, 400), (300, 250)],
+            [[float(i) + 100.0] * 7 for i in range(5)])
+        staged = []
+
+        class IO(FakeIO):
+            def stage(self, pose):
+                staged.append(list(pose))
+                super().stage(pose)
+
+        io = IO(saucer=[False], verify=[EMPTY])
+        r = Harness(make_table(), io, deep_table=deep,
+                    max_attempts=2).run_trial()
+        assert r.outcome == "gave_up"
+        assert len(staged) == 2
+        assert staged[0][0] < 100.0 <= staged[1][0]   # deep poses offset +100
+
+    def test_no_deep_table_keeps_normal_staging(self):
+        staged = []
+
+        class IO(FakeIO):
+            def stage(self, pose):
+                staged.append(list(pose))
+                super().stage(pose)
+
+        io = IO(saucer=[False], verify=[EMPTY])
+        Harness(make_table(), io, max_attempts=2).run_trial()
+        assert len(staged) == 2
+        assert staged[0] == staged[1]   # same pixel, same table, same pose
+
+
 class TestRecords:
     def test_attempt_records_carry_pixel_and_reason(self):
         io = FakeIO(saucer=[False], verify=[EMPTY])
