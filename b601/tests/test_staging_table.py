@@ -75,3 +75,61 @@ def test_round_trip_through_json(tmp_path):
     t.write(p)
     t2 = StagingTable.load(p)
     assert t2.query(150.0, 100.0)[0] == pytest.approx(t.query(150.0, 100.0)[0])
+
+
+class TestExtrapolationHybrid:
+    """Beyond knn_radius_px, queries follow the GLOBAL quadratic trend
+    instead of clamping to the nearest cluster — measured on synthetic
+    holes: kNN max positional error 26.6 deg vs quadratic 20.8, and the
+    shakedown's held-out trial staged visibly off the block at 56 px
+    (kNN's one-sided neighbors cannot see the trend into the hole)."""
+
+    def _plane_table(self):
+        # pose is a linear trend of pixel: pose_j = x/10 + j*y/10
+        import itertools
+        pts, poses = [], []
+        for x, y in itertools.product(range(100, 501, 50), range(100, 401, 50)):
+            if 200 <= x <= 300 and 200 <= y <= 300:
+                continue                      # a hole, like the held-out zone
+            pts.append((float(x), float(y)))
+            poses.append([x / 10.0 + j * y / 10.0 for j in range(7)])
+        from b601.staging.table import StagingTable
+        return StagingTable.fit(pts, poses), poses
+
+    def test_interior_query_still_knn(self):
+        t, _ = self._plane_table()
+        pose, d = t.query(101.0, 101.0)
+        assert d < 5
+        assert abs(pose[0] - 10.0) < 1.0
+
+    def test_hole_query_follows_global_trend(self):
+        t, _ = self._plane_table()
+        pose, d = t.query(250.0, 250.0)       # centre of the hole, ~50px out
+        assert d > 25                          # genuinely extrapolating
+        expected = [250 / 10.0 + j * 250 / 10.0 for j in range(7)]
+        for j in range(4):
+            assert abs(pose[j] - expected[j]) < 2.0, (j, pose[j], expected[j])
+
+    def test_far_query_still_refused(self):
+        import pytest
+        from b601.staging.table import StagingError
+        t, _ = self._plane_table()
+        with pytest.raises(StagingError):
+            t.query(900.0, 900.0)
+
+    def test_round_trip_keeps_hybrid(self, tmp_path):
+        from b601.staging.table import StagingTable
+        t, _ = self._plane_table()
+        p = tmp_path / "t.json"
+        t.write(str(p))
+        t2 = StagingTable.load(str(p))
+        a, _ = t.query(250.0, 250.0)
+        b, _ = t2.query(250.0, 250.0)
+        assert all(abs(x - y) < 1e-6 for x, y in zip(a, b))
+
+    def test_small_table_falls_back_to_knn(self):
+        from b601.staging.table import StagingTable
+        t = StagingTable.fit([(0.0, 0.0), (10.0, 0.0), (0.0, 10.0)],
+                             [[1.0] * 7] * 3)
+        pose, d = t.query(50.0, 50.0)          # extrapolated, tiny table
+        assert abs(pose[0] - 1.0) < 1e-6       # kNN answer, no crash

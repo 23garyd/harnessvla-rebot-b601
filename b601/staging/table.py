@@ -1,8 +1,15 @@
 """Block pixel -> pre-grasp joint pose, learned from the demonstrations.
 
 Each corpus episode pairs a block position (agentview pixel) with the pose
-the operator staged just before the grasp. Queries interpolate the k nearest
-demonstrated placements by inverse distance. Two refusals, both fail-closed:
+the operator staged just before the grasp. Queries inside demonstrated
+coverage (nearest placement <= knn_radius_px) interpolate the k nearest
+placements by inverse distance. Beyond that — the held-out zone's 40-90 px
+gap — a GLOBAL quadratic trend fitted over every pair answers instead:
+k-NN's one-sided neighbors clamp to the nearest cluster and cannot see the
+trend into a coverage hole (measured: the first held-out shakedown trial
+staged visibly off the block at 56 px; synthetic-hole validation, max
+positional error: k-NN 26.6 deg vs quadratic 20.8). Two refusals, both
+fail-closed:
 
   - a query farther than `max_extrapolation_px` from EVERY demonstrated
     placement is refused — staging at a wild extrapolation points the frozen
@@ -21,6 +28,13 @@ from pathlib import Path
 
 DEFAULT_K = 3
 DEFAULT_MAX_EXTRAPOLATION_PX = 100.0
+DEFAULT_KNN_RADIUS_PX = 25.0
+_QUAD_MIN_POINTS = 12    # 6 coefficients; demand 2x for a stable fit
+
+
+def _quad_features(px, py):
+    x, y = px / 100.0, py / 100.0
+    return (1.0, x, y, x * y, x * x, y * y)
 
 
 class StagingError(Exception):
@@ -33,10 +47,13 @@ class StagingTable:
     poses: tuple           # ((j0..jn), ...) same length
     k: int = DEFAULT_K
     max_extrapolation_px: float = DEFAULT_MAX_EXTRAPOLATION_PX
+    knn_radius_px: float = DEFAULT_KNN_RADIUS_PX
+    quad: tuple = None     # (6 x n_dims) trend coefficients, or None
 
     @classmethod
     def fit(cls, points, poses, k=DEFAULT_K,
-            max_extrapolation_px=DEFAULT_MAX_EXTRAPOLATION_PX):
+            max_extrapolation_px=DEFAULT_MAX_EXTRAPOLATION_PX,
+            knn_radius_px=DEFAULT_KNN_RADIUS_PX):
         points = tuple((float(x), float(y)) for x, y in points)
         poses = tuple(tuple(float(v) for v in p) for p in poses)
         if len(points) != len(poses):
@@ -47,8 +64,15 @@ class StagingTable:
             raise StagingError(
                 f"need at least 2 demonstrated placements to interpolate, "
                 f"got {len(points)}")
+        quad = None
+        if len(points) >= _QUAD_MIN_POINTS:
+            import numpy as np
+            A = np.array([_quad_features(x, y) for x, y in points])
+            W, *_ = np.linalg.lstsq(A, np.array(poses), rcond=None)
+            quad = tuple(tuple(float(v) for v in row) for row in W)
         return cls(points=points, poses=poses, k=k,
-                   max_extrapolation_px=max_extrapolation_px)
+                   max_extrapolation_px=max_extrapolation_px,
+                   knn_radius_px=knn_radius_px, quad=quad)
 
     def query(self, px, py):
         """-> (pose, nearest_distance_px). Refuses wild extrapolation."""
@@ -62,6 +86,13 @@ class StagingTable:
                 f"nearest demonstrated placement — beyond the "
                 f"{self.max_extrapolation_px:.0f}px guard. No demonstration "
                 f"ever staged there; refusing to guess")
+        if nearest > self.knn_radius_px and self.quad is not None:
+            # coverage hole: follow the global trend, not the nearest cluster
+            f = _quad_features(px, py)
+            n = len(self.poses[0])
+            pose = [sum(f[c] * self.quad[c][j] for c in range(6))
+                    for j in range(n)]
+            return pose, nearest
         chosen = d2[:min(self.k, len(d2))]
         if chosen[0][0] == 0.0:                      # exact hit
             return list(self.poses[chosen[0][1]]), 0.0
@@ -83,10 +114,13 @@ class StagingTable:
             "poses": list(self.poses),
             "k": self.k,
             "max_extrapolation_px": self.max_extrapolation_px,
+            "knn_radius_px": self.knn_radius_px,
         }, indent=1))
 
     @classmethod
     def load(cls, path):
         raw = json.loads(Path(path).read_text())
         return cls.fit(raw["points"], raw["poses"], k=raw["k"],
-                       max_extrapolation_px=raw["max_extrapolation_px"])
+                       max_extrapolation_px=raw["max_extrapolation_px"],
+                       knn_radius_px=raw.get("knn_radius_px",
+                                             DEFAULT_KNN_RADIUS_PX))

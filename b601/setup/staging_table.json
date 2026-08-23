@@ -1464,5 +1464,6 @@
   ]
  ],
  "k": 3,
- "max_extrapolation_px": 100.0
+ "max_extrapolation_px": 100.0,
+ "knn_radius_px": 25.0
 }
