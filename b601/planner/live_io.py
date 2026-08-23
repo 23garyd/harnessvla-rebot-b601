@@ -188,6 +188,42 @@ class LiveIO:
         # construction, but the physical gripper must CONFIRM before moving)
         self._open_gripper_and_wait("stage_open")
         self._move_to_state_pose(pose, "stage")
+        self._servo_to_pregrasp()
+
+    def _servo_to_pregrasp(self):
+        """Close the loop on the wrist view: drive the block's centroid to
+        the demonstrated pre-grasp target. The open-loop table misses by cm
+        in the held-out hole (shakedown-4: nine of nine attempts) while the
+        block was in the wrist view every time. Best-effort: any stop
+        condition proceeds to the policy — danger stays the guard's job."""
+        from b601.planner.io_support import ServoController
+        s = self._cfg.get("servo")
+        if not s:
+            return
+        self._phase = "servo"
+        servo = ServoController(
+            target=tuple(s["target"]), tolerance_px=s["tolerance_px"],
+            gain=s["gain"], max_step_deg=s["max_step_deg"],
+            max_total_deg=s["max_total_deg"], max_ticks=s["max_ticks"],
+            stall_ticks=s["stall_ticks"], jx_pan=s["jx_pan"],
+            jy_reach=s["jy_reach"])
+        while True:
+            t0 = self._clock()
+            obs = self._obs()
+            step = servo.step(perception.wrist_block_pixel(
+                obs.get("eye_in_hand")))
+            if step is None:
+                return
+            d_pan, d_reach = step
+            state = self._state_vec(obs)
+            target = state.copy()
+            target[0] += d_pan
+            target[1] += d_reach / 2.0     # reach split across lift+elbow
+            target[2] += d_reach / 2.0
+            self._send(self._sam.to_action(target))
+            rest = self._dt - (self._clock() - t0)
+            if rest > 0:
+                self._sleep(rest)
 
     def invoke_policy(self):
         self._phase = "policy"

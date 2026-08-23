@@ -151,3 +151,70 @@ class TestPerception:
     def test_invalid_frame_fails_closed(self):
         assert perception.block_pixel(None) is None
         assert perception.saucer_red_fraction(None, (464, 315), 30) == 0.0
+
+
+class TestServoController:
+    """Wrist-image servo: after the open-loop stage lands near the block,
+    close the loop on WHERE THE BLOCK SITS IN THE WRIST FRAME vs the
+    demonstrated pre-grasp target. Fixes what no table can: open-loop
+    extrapolation into the held-out hole missed by cm in nine of nine
+    shakedown-4 attempts while the block was visible in the wrist view
+    every time. Best-effort by design: no block or no progress -> STOP
+    and proceed, never abort (the guard covers real danger)."""
+
+    def make(self, **kw):
+        from b601.planner.io_support import ServoController
+        cfg = dict(target=(360.0, 404.0), tolerance_px=25.0,
+                   gain=0.5, max_step_deg=1.5, max_total_deg=12.0,
+                   max_ticks=120, stall_ticks=30,
+                   jx_pan=-12.8, jy_reach=2.5)
+        cfg.update(kw)
+        return ServoController(**cfg)
+
+    def _run_plant(self, servo, start, jac=(-12.8, 2.5)):
+        """Linear plant: centroid moves per the true jacobian."""
+        c = np.array(start, dtype=float)
+        for _ in range(200):
+            step = servo.step((c[0], c[1]))
+            if step is None:
+                return c, servo
+            dpan, dreach = step
+            c[0] += jac[0] * dpan
+            c[1] += jac[1] * dreach
+        raise AssertionError("servo never terminated")
+
+    def test_converges_on_linear_plant(self):
+        c, servo = self._run_plant(self.make(), (300.0, 350.0))
+        assert servo.converged
+        assert abs(c[0] - 360) <= 25 and abs(c[1] - 404) <= 25
+
+    def test_steps_are_capped(self):
+        servo = self.make()
+        dpan, dreach = servo.step((100.0, 200.0))   # huge error
+        assert abs(dpan) <= 1.5 and abs(dreach) <= 1.5
+
+    def test_total_budget_capped(self):
+        servo = self.make(max_total_deg=3.0)
+        total = 0.0
+        c = np.array([100.0, 404.0])
+        for _ in range(200):
+            step = servo.step((c[0], c[1]))
+            if step is None:
+                break
+            total += abs(step[0])
+            # adversarial plant: centroid never moves
+        assert total <= 3.0 + 1e-9
+        assert not servo.converged
+
+    def test_no_block_stops_not_raises(self):
+        servo = self.make()
+        assert servo.step(None) is None
+        assert not servo.converged
+
+    def test_stall_detection_stops(self):
+        servo = self.make(stall_ticks=10)
+        for i in range(300):
+            if servo.step((100.0, 404.0)) is None:   # frozen plant
+                break
+        assert i < 250
+        assert not servo.converged

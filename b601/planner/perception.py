@@ -60,3 +60,20 @@ def saucer_red_fraction(frame_rgb, center, radius) -> float:
     if total == 0:
         return 0.0
     return float(np.count_nonzero(mask[disk])) / total
+
+
+def wrist_block_pixel(frame_rgb):
+    """Centroid of the largest red component in the WRIST frame, or None.
+
+    No top-row mask (the wrist looks at the mat, not the desk) and a larger
+    area floor: at pre-grasp range the block is hundreds of px; small red
+    flecks are reflections."""
+    mask = _red_mask(frame_rgb)
+    if mask is None:
+        return None
+    cnt, _, stats, cents = cv2.connectedComponentsWithStats(mask)
+    best = max((i for i in range(1, cnt) if stats[i, cv2.CC_STAT_AREA] >= 400),
+               key=lambda i: stats[i, cv2.CC_STAT_AREA], default=None)
+    if best is None:
+        return None
+    return float(cents[best][0]), float(cents[best][1])
