@@ -395,3 +395,155 @@ left.
 Before scaled collection (Days 6–10): staging method + block-scatter region
 (one decision, see HANDOVER), off-machine backup, and the Day-1 mentor gate
 paperwork. 495 tests, 2 skipped.
+
+---
+
+## Days 6–18 — consolidated entry (written 2026-08-24, reconstructed)
+
+**Why this entry is retrospective.** Per-day entries stopped after Day 5
+(2026-08-08) while work continued to 2026-08-23. The authority for this period
+is `experiment_registry.md` (current) and the commit record, both of which were
+kept; this entry consolidates them so the progress log stops lying by omission.
+Anything below is traceable to a registry row or a commit. It is not a
+substitute for the per-day discipline — that resumes with the next session.
+
+### Days 6–10 — collection (2026-08-10 → 08-12)
+
+`local/b601_train`: **168 certified episodes, 96,058 frames, zero held-out
+leakage**, snapshot `b601_train_final168_20260812`. Target was 150.
+
+Collection was not clean, and the audit trail is the deliverable as much as the
+corpus is:
+
+| Session | Finding | Disposition |
+|---|---|---|
+| 2 | reset-inside-recording | 4 quarantined, 6 kept |
+| — | gripper-failure session | 4 removed, 1 success kept |
+| 4 | frame-level trims | 8 of 27 salvaged |
+| 5 | trim pipeline routine | corpus at 64 |
+| 6 | boundary shift, framed as input-path | corpus at 73; framing later contradicted by operator observation |
+| — | **orphan rows: every index table desynced since session 2** | root-caused; 66 episodes revalidated on a corrected map |
+| — | merge damaged `file-008` (episodes 46, 48–50) | excluded; v1 trained on 164 of 168 |
+
+Two vendor patches logged in this window (blocking record announcement;
+frame-index clamp), each re-pinned. **Staging method decided: image-space**,
+with rationale and foreclosures recorded in `calibration_report.md` — there is
+no metric camera-to-robot calibration, by decision rather than omission.
+
+### Days 11–12 — training (2026-08-12)
+
+ACT 52M, 100k steps, batch 8, lr 1e-5 on the RTX 5090. **Loss 4.60 → 0.062
+monotone** over 8.5 epochs, grad norm 114 → 4.4, ~70 ms/update. Five
+checkpoints, 2.9 GB, backed up to the NVMe. `artifacts/act_b601_v1_20260812`.
+
+### Days 13–14 — evaluation, and two hard results (2026-08-13 → 08-14)
+
+**SAFETY EVENT (2026-08-14): a stall broke the arm.** Root cause: *the safety
+layer was absent from the eval path*. The chokepoint that the entire Day-0
+design was built around was not in the loop that ran the policy. Fixes landed
+the same day: per-tick motion clamp in the eval path, per-joint clamp derived
+from the demonstrated envelope, command-stream rate limits, and the
+safety-event mechanism itself corrected. Fifth vendor patch logged.
+
+This is the single most important finding of the period and it is not a
+software defect in isolation — it is the failure mode the sim track named as
+"a guard that cannot see the failure it guards", reappearing physically.
+
+One evaluation was **voided** before that (2026-08-13): a photometric shift,
+not policy failure. Voided rather than reported.
+
+**Day-14 gate: FAILED.**
+
+| Condition | Result |
+|---|---|
+| Held-out zone | **0/10** |
+| In-distribution controls | **3/5 (60% one-shot)** |
+
+The primitive works where it was demonstrated and does not generalise to the
+untrained zone — **the exact profile the harness thesis presupposes**. The
+checkpoint was therefore frozen *as an imperfect primitive*, and Day 18
+proceeds against the +15 pp-over-one-shot bar. This is a stronger test than the
+plan anticipated, which assumed a ≥70% primitive.
+
+### Days 15–18 — the harness, and four live shakedowns (2026-08-15 → 08-23)
+
+Built: loop state machine (every branch tested unpowered), live I/O wiring,
+**grasp verifier calibrated at 416/417 holds**, staging table (block pixel →
+pre-grasp pose, fail-closed, LOO p90 under 6°; v4 after v3 read the gripper
+convention backwards).
+
+Four shakedowns on the real arm, each producing a mechanism rather than a score:
+
+| # | Result | Finding |
+|---|---|---|
+| 1 | 2/4 train, 0/1 held-out | **Operator-in-frame makes the policy RETREAT.** Proven by occlusion probes: swapping a 107×120 px patch flips RETREAT↔CONTINUE. Training tails contain the operator reaching in post-place, so person-in-frame = episode over = go home |
+| 2 | 2/3 train, 0/1 held-out | Out-of-frame rule **worked**: 5/7 policy segments continue from the staged pose, against 0/7 before. **First live firing of the verify → place-recovery branch.** Residual failure is grasp precision |
+| 3 | 0/3 | Closed fingers **plowed the cube** — open-loop approach plus lagging gripper, and half the demonstrated p99.9 envelope still reads as very fast. Fixes: open gripper first (closed-loop, state ≥ 240), quarter-speed staging |
+| 4 | 0/3 | Plowing gone. Diagnosis moved up a level: **no open-loop table can stage accurately where no demonstration went.** But the block was in the wrist view at stage-end in 9 of 9 attempts |
+
+**Conclusion driving current work:** close the loop. A servo phase after every
+stage drives the block's wrist-frame centroid to the demonstrated pre-grasp
+target (median (360,404), n=84) using measured pan (−12.8 px/deg). Landed
+2026-08-23; not yet tried on hardware.
+
+### State at the end of this period
+
+566 tests, 2 skipped. Zero open risks (7 monitoring, 2 mitigated). Datasets:
+`b601_train` 7.6 G, `eval_b601_v1` 3.1 G, `b601_pilot` 584 M. Trial footage:
+`outputs/harness_trials`, 40 videos, 3.8 G, **untracked and unmanifested**.
+
+## Shakedown 5 — 2026-08-24: the servo under-acted, and the thesis met a boundary
+
+3 held-out trials, 9 attempts. Servo traces plus servo-end and close frames
+extracted for all 9.
+
+### Result: 0/3
+
+| Defect | Measurement |
+|---|---|
+| Reach axis under-acted | Spent its 12° budget in 12 ticks (1°/tick against large y-errors) then exited. **6 of 8 servo phases ended at ~12 ticks having moved pan only 3° against 50–100 px errors** |
+| Shallow-stage oscillation | 2 servos flipped pan direction 4–5 times — the jerkiness the operator saw. Gain × lag overshoot |
+| Servo skipped | 1 attempt: block not in wrist view at stage-end |
+| Outcome | Servo-end frames show the cube still off-centre in **9 of 9** |
+
+The servo is fixable. That is not the finding.
+
+### THE STRATEGIC FINDING — sessions 2 through 5
+
+**~15 held-out policy grasp attempts. Zero grasps.** Including attempts that
+ended **7–10 px from demonstrated coverage** after the cube was shoved to the
+coverage edge — that is, attempts whose delivery was demonstrably good.
+
+The frozen policy's final 5 cm is wrong in this region **regardless of delivery
+quality**. Staging and retries *multiply* a per-attempt grasp probability, and
+that probability is approximately zero here. Multiplying zero returns zero for
+any number of attempts.
+
+This bounds the harness thesis rather than refuting it. "An agent harness makes
+an imperfect primitive more reliable" holds where the primitive retains
+non-zero competence. Where competence has collapsed, the harness has to
+**complete** the task, not re-attempt it. Four shakedowns removed four delivery
+mechanisms; the fifth showed delivery was never the binding constraint in this
+region.
+
+It is worth recording that this is a more informative outcome than a successful
+rescue would have been, and that it was only visible because held-out trials
+were run separately from in-distribution ones and counted separately.
+
+### Decision point — recorded for the owner, NOT taken
+
+| Option | What it is | Consequence |
+|---|---|---|
+| **A — harness recovery grasp** | After a verified policy failure: servo-centre (fixed), descend a measured depth, close to the measured hold band, lift, verify. All quantities measured; every part already proven live — the symmetric place-recovery branch works | **Changes the claim** to "the harness completes what the primitive cannot", policy still invoked first. The only option that can still produce a positive Day-18 result |
+| **B — run Day-18 as-is** | Report the negative result with the full causal chain | Defensible and cheap. The chain is strong: five sessions, each with a measured mechanism |
+| **C — tune the servo, re-shakedown** | Weakest | Coverage-edge attempts failed too, so delivery quality is not what is binding |
+
+**Day 18 cannot be scheduled until this is chosen** — A and B are different
+experiments, and as currently designed the comparison would measure 0 against 0.
+
+### Registry note
+
+This entry was added 2026-08-25. Sessions 1–4 and this one are recorded in
+`experiment_registry.md` as they happened; the progress log lagged again, which
+is the same drift that put it 16 days behind in August. The registry is the
+authority for trial results; this log is the narrative.

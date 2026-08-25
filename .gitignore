@@ -20,3 +20,6 @@ b601/setup/urdf/
 !datasets/README.md
 !checkpoints/README.md
 !artifacts/README.md
+
+# Trial footage: bulk. Indexed by b601/registry/harness_trials_manifest.csv
+outputs/

@@ -10,30 +10,48 @@ Explicitly NOT in scope: running the released LIBERO pi0.5 checkpoint on the
 B601. The learned primitive here is a B601-specific ACT policy trained from
 teleoperated demonstrations.
 
-## Where things stand (2026-08-07 evening)
-Day 3-4 bring-up. 495 tests green in the unpowered suite (`PYTHONNOUSERSITE=1
-PYTHONPATH= .venv/bin/python -m pytest b601/tests/ -q`). Teleop verified,
-cameras verified, pins verified, **zero episodes recorded** — one physical
-blocker stands between here and the first episode (next section).
+## Where things stand (2026-08-24)
 
-**The 0-frame D405 saga is CLOSED.** It was two stacked defects, neither of
-them the USB link (the D405 now sits on a verified USB 3.2 / 5 Gbps cable):
-1. **Vendor null-frame bug, fixed** — vendor commit `3b4f877`,
-   `LEROBOT_ORIGIN` re-pinned. A colour-only frameset's `get_depth_frame()`
-   returns a null frame (falsy, never None); the wrapper's `is not None`
-   check then exploded on every frameset and the read loop suppressed it
-   forever. Verified after fix: `async_read` 90/90 at 30.4 fps.
-2. **One-session-per-reset firmware behaviour, worked around** — the D405
-   (fw 5.12.14.100) streams exactly ONE pipeline session per hardware reset;
-   every later session opens fine and delivers nothing. Preflight's own
-   liveness grab was killing the recording after it. `b601.cameras.reset`
-   plus re-`capture` now run before preflight AND before `lerobot-record`
-   inside `record_session.sh`. If a manual camera check leaves the D405
-   dead, that is normal — reset, don't debug. Candidate real fix is a
-   firmware update: owner decision, in the risk log, not scheduled.
+Days 6–18 complete. **566 tests green** in the unpowered suite
+(`PYTHONNOUSERSITE=1 PYTHONPATH= .venv/bin/python -m pytest b601/tests/ -q`).
+Zero open risks (7 monitoring, 2 mitigated).
 
-Full story: risk_log.md rows of 2026-08-06/07, protocol_deviations.md (two
-vendor patches), RUNBOOK.md "one pipeline session per reset" item.
+| | |
+|---|---|
+| Dataset | **168 certified episodes**, 96,058 frames, zero held-out leakage (`b601_train_final168_20260812`) |
+| Policy | ACT 52M trained to loss **0.062**; `artifacts/act_b601_v1_20260812`, 2.9 G |
+| **Day-14 gate** | **FAILED — held-out 0/10, in-distribution 3/5.** Primitive frozen anyway, *as an imperfect primitive*: this is the profile the harness thesis presupposes, and a harder test than the plan's ≥70% assumption |
+| Harness | Loop state machine, live I/O, grasp verifier (**416/417 holds**), staging table (LOO p90 < 6°) |
+| Live shakedowns | **4 run**, 30 live trials + 10 dry, 40 videos in `outputs/harness_trials` (3.8 G) |
+| Day-18 bar | +15 pp over the one-shot primitive |
+
+**The diagnosis chain is the result so far**, not the pass rate:
+
+1. Operator-in-frame makes the policy retreat — proven by occlusion probe, a
+   107×120 px patch flips the behaviour. Training tails taught it that a
+   person in view means the episode is over.
+2. With the operator out of frame, 5 of 7 policy segments continue from the
+   staged pose (0 of 7 before), and the verify → place-recovery branch fired
+   live for the first time.
+3. Closed fingers plowed the cube: open-loop approach plus a lagging gripper.
+   Fixed by opening the gripper first, closed-loop, at quarter speed.
+4. With that fixed, the wall is staging accuracy: **no open-loop table can
+   stage where no demonstration went** — but the wrist camera saw the block in
+   9 of 9 attempts.
+
+**Current frontier:** a wrist-image servo phase after staging (landed
+2026-08-23, `72732d1`) drives the block's wrist-frame centroid to the
+demonstrated pre-grasp target using measured pan (−12.8 px/deg).
+**Not yet tried on hardware** — that is the next session.
+
+### SAFETY EVENT, 2026-08-14 — read this before touching the eval path
+A stall broke the arm because **the safety layer was absent from the eval
+path**. The chokepoint the whole design is built around was not in the loop
+that ran the policy. Per-tick and per-joint clamps, command-stream rate limits
+and the safety-event mechanism were all corrected the same day. Treat any new
+execution path as unguarded until you have shown otherwise — this is the
+physical form of the sim track's "a guard that cannot see the failure it
+guards".
 
 ## EVERY MORNING — the power-up ritual (all of it recurs per boot)
 1. **Power the arm, bring up CAN** (needs sudo, password location is in the
