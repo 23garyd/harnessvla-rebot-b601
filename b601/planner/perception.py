@@ -19,8 +19,13 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-HSV_LOW1, HSV_HIGH1 = (0, 70, 90), (14, 255, 255)
-HSV_LOW2, HSV_HIGH2 = (168, 70, 90), (180, 255, 255)
+# Saturation floor 55 (was 70): measured 2026-08-28 after the glare fix, the
+# worst spot on the mat (upper H-zone edge) still washes the block to S=72 —
+# a 2-point margin at gate 70. 55 clears it with margin; the mat itself
+# cannot reach the red hue band, and the skin-at-reset exposure is unchanged
+# (skin passed 70 too — ep24). Recalibrate from v2 corpus at build time.
+HSV_LOW1, HSV_HIGH1 = (0, 55, 90), (14, 255, 255)
+HSV_LOW2, HSV_HIGH2 = (168, 55, 90), (180, 255, 255)
 MIN_AREA = 250
 TOP_MASK = 60
 
