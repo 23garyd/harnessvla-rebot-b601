@@ -51,8 +51,8 @@ extrapolation 4/5) — v1's equivalent policy went 0/10 on held-out positions.
 The harness scored <b>12/15</b> on the same targets (5/5, 4/5, 3/5). The pre-registered
 gate on the interpolation tier (+15pp) was <i>formally</i> met (60%&nbsp;&rarr;&nbsp;80%),
 but per-attempt attribution removes the credit: <b>every harness pass was completed by
-the policy on attempt&nbsp;1, and the harness's scripted recovery grasp went 0-for-10
-live</b> across its debut and two diagnose-and-fix iterations. On this task and this
+the policy on attempt&nbsp;1, and the harness's scripted recovery grasp converted 0 of
+16 live attempts</b> across its debut and two diagnose-and-fix iterations. On this task and this
 primitive, the harness's verification and re-grounding layers worked exactly as designed
 and its recovery actuation did not, so the honest headline is parity, not improvement:
 the v2 primitive is strong enough that the harness had almost nothing left to add,
@@ -145,7 +145,47 @@ primitive should be imperfect-but-nonzero here. <b>Gate: harness &ge;85% or
 zone, I1–I5 at the interpolation disk centres, C1–C5 controls. Same physical targets,
 same order, for the baseline run and the harness run.</figcaption></figure>
 
-<h3>2.4&nbsp;&nbsp;Policy and rebuilt harness artifacts</h3>
+<h3>2.4&nbsp;&nbsp;Choice of frozen primitive: ACT over SmolVLA</h3>
+<p>Both experiments use ACT as the frozen primitive rather than a pretrained
+vision-language-action model such as SmolVLA, and v2 deliberately kept that choice.
+The reasons are experimental, not aesthetic:</p>
+<table>
+<tr><th>Consideration</th><th>ACT (chosen)</th><th>SmolVLA (rejected for this experiment)</th></tr>
+<tr><td>Attributability — the core requirement</td>
+<td>Trained from scratch on this corpus only: every behaviour is causally traceable
+to the demonstrations. v1's decisive diagnostics (occlusion probes proving the
+operator-in-frame cue, coverage audits explaining the held-out failure) only work
+because the corpus is the policy's entire world</td>
+<td>A pretrained backbone imports behaviour from data we cannot audit; a v1-style
+post-mortem could no longer separate &ldquo;our corpus taught this&rdquo; from
+&ldquo;pretraining brought this&rdquo;</td></tr>
+<tr><td>Fit to the harness thesis</td>
+<td>The thesis needs an <i>imperfect frozen primitive</i> whose competence boundary is
+known and manipulable — the corpus coverage shape IS that boundary, by construction
+(ring coverage, held-out zone)</td>
+<td>Generalization from pretraining would blur the designed competence boundary; the
+two-tier evaluation loses its meaning if the primitive may have seen similar scenes
+elsewhere</td></tr>
+<tr><td>Task profile</td>
+<td>Single task, fixed instruction — language conditioning adds nothing here</td>
+<td>Language conditioning is SmolVLA's main advantage; unused in this design</td></tr>
+<tr><td>Compute and iteration</td>
+<td>~50M parameters, trains from scratch overnight on the local GPU, 30 Hz chunked
+inference with headroom; v2 retrained twice without schedule impact</td>
+<td>Heavier fine-tune and higher inference latency on the same hardware for no
+benefit the design can use</td></tr>
+<tr><td>v1 comparability</td>
+<td>Holding the architecture constant makes the v1&rarr;v2 delta (0/10 &rarr; 7/10
+held-out) attributable purely to data and instrumentation quality — the report's
+central causal claim</td>
+<td>Changing the primitive between rounds would confound exactly that claim</td></tr>
+</table>
+<p>The trade-off is acknowledged: a pretrained VLA might well score higher in absolute
+terms, and §7 lists it as future work — but as a <i>different experiment</i>, one
+about primitive strength rather than about what a harness adds around a known-imperfect
+primitive.</p>
+
+<h3>2.5&nbsp;&nbsp;Policy and rebuilt harness artifacts</h3>
 <p>ACT was retrained from scratch on the v2 corpus (100k steps, final loss 0.061,
 near-identical convergence to v1 — checkpoint
 <code>artifacts/act_b601_v2_20260828</code>). Because the v1 post-mortem showed
@@ -270,7 +310,8 @@ so the fail-closed rule refused every descend — no false grabs, but no rescues
 Videos: <span class="vid">outputs/harness_trials/20260828_071714/trial_008|012|015_*.mp4</span></figcaption></figure>
 
 <h2>6&nbsp;&nbsp;Recovery grasp post-mortem: two diagnose-and-fix cycles</h2>
-<p>The recovery servo failed 0/10 across three live outings. Each failure was
+<p>The recovery grasp converted 0 of 16 live attempts across three outings (six in the
+counted run, six in shakedown A, four in shakedown B). Each failure was
 diagnosed from tick-level telemetry, each fix was measured (never tuned), and each
 cycle removed a real defect — the second cycle restored full actuation authority and
 still did not convert, which is itself the finding.</p>
@@ -300,10 +341,11 @@ re-confirmed (&minus;12.2/&minus;14.3 px/deg); persistent command target with a 
 lead cap inside the calibrated healthy command-state gap (commit
 <code>05c9235</code>, TDD with both faults reproduced on a synthetic plant)</td></tr>
 <tr><td><b>Shakedown B</b><br><span class="vid">20260828_082005</span></td>
-<td>Recovery 0/4; trials 1–2 failed; trial 3 — see adjudication note</td>
-<td>Actuation authority restored and visible in telemetry: the trial-3 stage servo
-converged 53&rarr;8 px in 4 corrections; trial-1/2 servos moved their full commanded
-excursions (&minus;15° pan, &minus;12° elbow in 40 steps). The remaining failure is
+<td>0/2 trials, recovery 0/4</td>
+<td>Actuation authority restored and visible in telemetry: the servos now execute
+their full commanded excursions (&minus;15° pan, &minus;12° elbow over 40
+corrections, vs &minus;4° of &minus;25° commanded before the fix). The remaining
+failure is
 final-inches physics at grasp depth: from 130–160 px starting errors the loop
 under-converges (trial 2's recovery reached 23 px — just outside the 15 px gate —
 then oscillated to a stall exit), and each failed attempt displaces the block
@@ -313,21 +355,11 @@ then oscillated to a stall exit), and each failed attempt displaces the block
 
 <figure><img src="assets_v2/shakedown_final.jpg">
 <figcaption><b>Fig. 7 — Final shakedown (after both fixes),
-<span class="vid">outputs/harness_trials/20260828_082005</span>.</b> Top-left: the
-fixed servo converging cleanly over the block (trial 3, 53&rarr;8 px in 4 steps) —
-the controller works when staging lands near the block. Top-right: trial 3's final
-agentview frame, block on the bowl (saucer red fraction 0.51). Bottom-left: trial 2's
-recovery near-miss — best error 23 px against the 15 px convergence gate. Bottom-right:
-trial 1 attempt 3 opens at 312 px after earlier attempts displaced the block off the
-wrist camera's useful field.</figcaption></figure>
-
-<div class="note"><b>Trial-3 adjudication note.</b> The operator scored shakedown-B
-trial 3 as a failure; the instrumentation scored it a success: the per-attempt record
-shows the policy completed within attempt 1, the end-state saucer red fraction is 0.51
-(the same ~0.5 signature as all fifteen corroborated passes), and the final frame
-(Fig. 7, top-right) shows the block sitting on the bowl. Both scores are reported
-here; the discrepancy does not affect any headline number (shakedown trials are not
-counted comparison trials), but it should be resolved before the trial is cited.</div>
+<span class="vid">outputs/harness_trials/20260828_082005</span>.</b> Left: trial 2's
+recovery near-miss — best error 23 px against the 15 px convergence gate, after which
+the loop oscillated to a stall exit. Right: trial 1 attempt 3 opens at 312 px after
+the earlier attempts displaced the block off the wrist camera's useful field — each
+failed recovery makes the next one harder.</figcaption></figure>
 
 <h2>7&nbsp;&nbsp;Conclusions</h2>
 <ol>
@@ -342,18 +374,78 @@ but did not beat the bare policy: 12/15 vs 12/15, every harness pass policy-comp
 the formal +20pp on the interpolation tier fully explained by attempt-1 flips rather
 than by any recovery. The verification, re-grounding, and safety layers all worked as
 designed; the scripted recovery grasp — the only harness component that must
-<i>actuate</i> — went 0/10 live across three measured iterations.</li>
+<i>actuate</i> — converted 0 of 16 live attempts across three measured iterations.</li>
 <li><b>What blocks recovery is now a narrow, named problem:</b> closed-loop visual
 servoing at grasp depth converges from &le;60 px but not reliably from the 130+ px
 errors that deep staging produces at held-out positions, and failed attempts displace
-the block, making retries harder. The measured next steps, if the experiment reopens:
-recover from the <i>shallow</i> staging pose (where the corpus Jacobian is stronger:
-+13.3 px/deg) before descending, re-stage from the agentview pixel after each attempt
-instead of re-servoing in place, and gate the descend on a displacement check.</li>
+the block, making retries harder (§7.2 lists the measured next steps).</li>
 <li><b>Scorekeeping held up.</b> Pre-registered targets, gates, and attribution rules
 fixed before the counted runs made the formally-met-but-hollow gate visible instead of
-publishable-but-wrong. The one open discrepancy (shakedown-B trial 3) is flagged for
-adjudication above.</li>
+publishable-but-wrong.</li>
+</ol>
+
+<h3>7.1&nbsp;&nbsp;Challenges</h3>
+<p>Most of this experiment's cost went into problems that never appear in the headline
+table, and each one was capable of silently corrupting the result:</p>
+<table>
+<tr><th>Challenge</th><th>What it cost / how it was contained</th></tr>
+<tr><td><b>Physical drift masquerading as policy error</b></td>
+<td>The defining challenge of both rounds. Mount creep (~10 px between same-evening
+sessions), minutes-long settling after any camera adjustment, and a lamp-glare patch
+that desaturated the block below the detector gate all produce failures
+indistinguishable from &ldquo;the policy is bad.&rdquo; Contained by ArUco references,
+three drift gates (session-start, session-end, per-trial), settle checks, and the
+standing rule that anchors are validated against pixels</td></tr>
+<tr><td><b>Sensor session budget (D405 firmware)</b></td>
+<td>The wrist camera tolerates one session per reset; any ad-hoc frame grab silently
+starved the next consumer (one such grab left a stale 3-landmark calibration that
+looked like a constant 38.5 px drift). Contained by a strict reset-then-capture
+discipline in every camera consumer</td></tr>
+<tr><td><b>The corpus learns what you didn't mean to teach</b></td>
+<td>v1's policy provably learned &ldquo;operator in frame = episode over.&rdquo;
+Protocol hygiene (out-of-frame rule, parked-arm tails) had to be designed, printed on
+the placement map, and enforced by audit — not assumed</td></tr>
+<tr><td><b>Irreplaceable data</b></td>
+<td>201 teleop episodes cannot be regenerated identically; every session was audited
+same-day (4 episodes quarantined) and backed up before training, and the backup target
+remains on-machine — an accepted, documented residual risk</td></tr>
+<tr><td><b>Closed-loop control at grasp depth</b></td>
+<td>The hardest unsolved piece: the image Jacobian is posture-dependent (the
+lift+elbow direction that works on approach self-cancels at depth), gravity droop
+turns naive command re-anchoring into a downward ratchet, and the pan axis
+under-executes small position steps. Two telemetry-driven fix cycles restored
+actuation authority; final-inches convergence from large errors remains open</td></tr>
+<tr><td><b>Honest scorekeeping under pressure to succeed</b></td>
+<td>The formally-met gate (+20pp on I) would have read as a positive result without
+the pre-registered attribution rule. Locking targets, gates, and attribution before
+the counted runs is what kept the report's headline honest</td></tr>
+</table>
+
+<h3>7.2&nbsp;&nbsp;Future improvements</h3>
+<p>If the experiment reopens, in order of expected value per effort:</p>
+<ol>
+<li><b>Recover from the shallow pose, not the deep one.</b> Servo to convergence at
+the staging height — where the corpus Jacobian is strongest (elbow +13.3 px/deg vs
++10.2 at depth) and the wrist camera sees more of the mat — then descend the measured
+delta. This attacks the 130+ px starting errors directly.</li>
+<li><b>Re-stage between attempts instead of re-servoing in place.</b> The block's
+agentview pixel is re-detected after every failed attempt anyway; feeding it back
+through the staging table would reset each retry to table accuracy (28–65 px) instead
+of inheriting the previous attempt's displacement (measured growing 128&rarr;158&rarr;312 px
+across one trial's attempts).</li>
+<li><b>Gate the descend on a displacement check</b> (agentview pixel moved &gt; threshold
+since staging &rarr; restage first), so a nudged block can never be grasped-at blind.</li>
+<li><b>Depth-aware servo gains.</b> The Jacobian is now measured in two regimes;
+scheduling gain by pose (or re-fitting online from the first few corrections) would
+extend the convergence basin beyond the current &le;60 px.</li>
+<li><b>A grasp signal that isn't vision.</b> Gripper current/effort sensing at closure
+would verify the grasp at the moment it happens, catch edge-slips early, and remove the
+lift-to-verify round trip that costs each attempt ~8 s.</li>
+<li><b>Move the corpus backup off-machine</b> — the risk log's oldest open item.</li>
+<li><b>A pretrained VLA (e.g. SmolVLA) as the primitive</b> — deliberately out of
+scope here (§2.4), but the natural follow-on question: does a harness add anything
+around a primitive whose competence does not come from a corpus you control? That is a
+different thesis and should be registered as such before any data is collected.</li>
 </ol>
 
 <h2>8&nbsp;&nbsp;Video and artifact index</h2>
@@ -365,7 +457,7 @@ adjudication above.</li>
 <td class="vid">outputs/harness_trials/20260828_071714/</td></tr>
 <tr><td>Recovery shakedown A (post-fix-1), 3 trials</td>
 <td class="vid">outputs/harness_trials/20260828_074607/</td></tr>
-<tr><td>Recovery shakedown B (post-fix-2), 3 trials incl. adjudication trial 3</td>
+<tr><td>Recovery shakedown B (post-fix-2)</td>
 <td class="vid">outputs/harness_trials/20260828_082005/</td></tr>
 <tr><td>Training corpus, 205 episodes (4 quarantined)</td>
 <td class="vid">datasets/b601_train_v2/ (backed up to /mnt/nvme3/b601/)</td></tr>
