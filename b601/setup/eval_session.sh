@@ -12,13 +12,13 @@ REPO="${B601_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 CONDA_PY="${B601_PY:-/home/demo/miniforge3/envs/lerobot/bin/python}"
 CONDA_BIN="$(dirname "$CONDA_PY")"
 BACKUP="${B601_BACKUP:-/mnt/nvme3/b601}"
-POLICY="${B601_POLICY:-$REPO/artifacts/act_b601_v1_20260812/checkpoints/100000/pretrained_model}"
+POLICY="${B601_POLICY:-$REPO/artifacts/act_b601_v2_20260828/checkpoints/100000/pretrained_model}"
 EVAL_TIME_S="${B601_EVAL_TIME_S:-40}"
 
 TRIALS="${1:-}"
 [ -n "$TRIALS" ] || { echo "usage: eval_session.sh <num_trials> [extra lerobot args]" >&2; exit 64; }
 
-DATASET_ID="${B601_DATASET_ID:-eval_b601_v1}"
+DATASET_ID="${B601_DATASET_ID:-eval_b601_v2}"
 DATASET_ROOT="${B601_DATASET_ROOT:-$REPO/datasets/$DATASET_ID}"
 
 fail() { echo "GATE FAILED: $*" >&2; exit 1; }

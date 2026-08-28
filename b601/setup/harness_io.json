@@ -11,21 +11,21 @@
   "state_action_map": {
     "m": [
       1.0,
-      0.97,
-      -1.024,
-      -1.002,
-      -1.022,
+      0.967,
+      -1.026,
+      -1.007,
+      -1.02,
       1.002,
-      0.174
+      0.188
     ],
     "c": [
-      0.17,
-      0.37,
-      -1.08,
-      -1.45,
-      0.04,
-      0.01,
-      -2.62
+      0.23,
+      0.6,
+      -1.01,
+      -1.55,
+      0.0,
+      0.02,
+      -1.23
     ]
   },
   "rate_limits_per_tick": [
@@ -57,38 +57,38 @@
   },
   "poses_state_space": {
     "park": [
-      -2.4,
+      -2.7,
+      -0.3,
       0.0,
-      0.0,
-      -1.0,
-      1.3,
-      2.6,
-      2.1
+      -0.7,
+      2.3,
+      5.3,
+      3.6
     ],
     "verify": [
-      -33.6,
-      91.8,
-      67.2,
-      -36.7,
-      -1.4,
-      -7.9,
-      151.7
+      -31.9,
+      89.9,
+      63.9,
+      -37.6,
+      -3.2,
+      -12.4,
+      153.0
     ],
     "place": [
-      -33.5,
-      104.0,
-      68.0,
-      -28.9,
-      0.6,
-      -10.6,
-      191.2
+      -35.3,
+      102.7,
+      66.0,
+      -27.4,
+      -2.1,
+      -14.8,
+      191.0
     ]
   },
   "gripper_open_state": 265.0,
   "servo": {
     "target": [
-      360,
-      404
+      387,
+      395
     ],
     "tolerance_px": 25.0,
     "gain": 0.2,
@@ -119,21 +119,21 @@
     ],
     "radius_px": 37,
     "red_fraction_threshold": 0.2,
-    "_provisional": "reference position 2026-08-27 (calibration 7709c9ef4715): centre measured directly (blue disk 86x84 px). Threshold carried from v1 \u2014 RECALIBRATE from v2 corpus end states before any counted run"
+    "_calibrated": "v2 corpus end states: fraction min 0.46 p5 0.50 med 0.53 vs threshold 0.20 \u2014 2.3x margin"
   },
   "verify_burst": 5,
   "verify_majority": 3,
   "policy_seconds_per_attempt": 40,
   "fps": 30,
   "_provenance": {
-    "date": "2026-08-15",
-    "state_action_map": "per-joint linear fit action_t vs state_(t+3) over the 168-episode corpus; arm joints r>=0.998 (|res| med<1 deg), gripper r=0.897. Elbow/wrist_flex/wrist_yaw sign-flipped; gripper 0..269 state -> 0..~47 action",
-    "rate_limits": "same per-tick envelope as eval_session.sh B601_MAX_ACTION_DELTA (demonstrated p99.9 + ~30%)",
+    "date": "2026-08-28 (v2 rebuild)",
+    "state_action_map": "refit on v2 corpus (201 eps, 3-tick lag); within 0.005 slope of v1 on arm joints, gripper 0.188",
+    "rate_limits": "carried from v1 envelope \u2014 same operator/arm; v2 holds and lengths match v1 within noise",
     "move_step": "quarter of the rate limit for arm joints (shakedown-3: half-envelope staging read as 'extremely fast' and plowed the closed gripper into the cube \u2014 the envelope is demonstrated p99.9, i.e. near the operator's fastest-ever motion; quarter matches typical demo approach speed). Gripper at full envelope: opening fast is safe and staging OPENS FIRST, closed-loop on gripper_open_min_state, before the arm approaches",
     "divergence": "healthy eval trials <=5 deg sustained (30-tick rolling min), grasp-contact 7, C2 table press 11 -> threshold 15 held 1 s aborts; guard compares command vs CONVERTED state so healthy baseline is the fit residual",
-    "poses": "corpus medians: park over first 8 frames (p90 spread <=4.7 deg arm), verify at mid-hold (arm raised, held block in wrist view), place 5 frames before release-open onset (p90 spread <=7.7 pan)",
+    "poses": "v2 corpus medians (n=201 park / 183 verify+place)",
     "saucer": "success = red fraction inside the 30 px disk at (464,315) >= 0.20; placed blocks read 0.30-0.63 (p5 0.302 healthy), trial starts 0.000; LOCAL check because skin passes the red gate (ep24's hand)",
     "verify": "burst majority 3/5 at the verify pose ONLY (low-hover blind spot, eval eps 21/29)",
-    "servo": "wrist-image feedback after every stage: drive the block centroid to the corpus pre-grasp target (median (360,404) at t_grasp-10, n=84, p10-p90 +-40px) via pan (-12.8 px/deg on x) and a lift+elbow reach split (+2.5 px/deg on y, R2 0.47 \u2014 feedback forgives the noise, only signs must hold). Added after shakedown-4: open-loop staging missed by cm in 9/9 held-out attempts while the block was in the wrist view every time. Best-effort: converged/lost/stalled/budget-out all proceed to the policy"
+    "servo": "v2 target (387,395) median wrist centroid at t_grasp-10, n~95, p10-p90 +-35px; coupling gains carried from v1 (same wrist camera)"
   }
 }

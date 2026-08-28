@@ -1,24 +1,38 @@
 {
-  "min_red_fraction": 0.10,
+  "min_red_fraction": 0.1,
   "min_bottom_fraction": 0.15,
   "gripper_hold_min": 110.0,
-  "gripper_hold_max": 200.0,
-  "hsv_low1": [0, 70, 90],
-  "hsv_high1": [14, 255, 255],
-  "hsv_low2": [168, 70, 90],
-  "hsv_high2": [180, 255, 255],
+  "gripper_hold_max": 212.0,
+  "hsv_low1": [
+    0,
+    70,
+    90
+  ],
+  "hsv_high1": [
+    14,
+    255,
+    255
+  ],
+  "hsv_low2": [
+    168,
+    70,
+    90
+  ],
+  "hsv_high2": [
+    180,
+    255,
+    255
+  ],
   "_provenance": {
-    "date": "2026-08-14",
-    "calibrated_from": "datasets/b601_train (168 episodes, v4 grasp anchors) + datasets/eval_b601_v1 (31 trials)",
-    "gripper_convention": "LOW=closed, HIGH=open; corpus hold values 121-186 (median 152), closed-on-air 0-30, full open ~270",
+    "date": "2026-08-28",
+    "calibrated_from": "datasets/b601_train_v2 (201 passing episodes, flutter-merged anchors)",
+    "gripper_convention": "LOW=closed, HIGH=open; v2 holds 138-206 (med 153), closed-on-air ~0-30, open ~265",
     "measured": {
-      "hold_frames_verified": "416/417 (miss: ep159, anomalous grip 245)",
-      "home_false_holds": "0/168",
-      "at_block_gripper_open_false_holds": "0/168",
-      "approach_false_holds": "1/168",
-      "post_release_transient_false_holds": "5/139 (gripper transits band while closing home, placed block in view)",
-      "eval_counted_passes_detected": "C1/C4/C5 (eps 17,25,28) all show sustained held-verdicts; all 13 lighting-voided trials zero"
+      "hold_frames_verified": "178/182 pre-band-widening (misses were one episode holding at 206 > old 200 cap; band widened to 212)",
+      "home_false_holds": "0/101",
+      "at_block_gripper_open_false_holds": "0/101",
+      "post_release_transient_false_holds": "3/91 (known transit class; harness verifies stationary at the verify pose)"
     },
-    "REQUIREMENT": "Verify ONLY after lifting to the designated verify pose. Measured failure mode (eval eps 21,29): wrist hovering LOW beside an un-grasped table block with a partially-closed gripper satisfies both cues persistently. From the lifted pose a table block reads bottom_fraction <=0.073 (p95) vs >=0.362 (p5) when truly held."
+    "REQUIREMENT": "Verify ONLY after lifting to the verify pose (v1 measured low-hover blind spot, eval eps 21/29)."
   }
 }

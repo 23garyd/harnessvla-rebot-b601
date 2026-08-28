@@ -37,8 +37,8 @@ K_BEFORE = 10         # frames before closure onset (see module docstring)
 ROLL_DIM = 5          # wrist_roll index in the state vector
 POSITIONAL = slice(0, 4)     # pan, lift, elbow, wrist_flex
 
-ds = LeRobotDataset("local/b601_train",
-                    root="/home/demo/Public/harnessvla-rebot-b601/datasets/b601_train",
+ds = LeRobotDataset("local/b601_train_v2",
+                    root="/home/demo/Public/harnessvla-rebot-b601/datasets/b601_train_v2",
                     tolerance_s=0.04)
 eps = ds.meta.episodes
 n = ds.meta.total_episodes
@@ -50,32 +50,41 @@ def agent_red(idx):
     except Exception:
         return None
     hsv = cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_RGB2BGR), cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, (0, 70, 90), (14, 255, 255)) | cv2.inRange(hsv, (168, 70, 90), (180, 255, 255))
+    mask = cv2.inRange(hsv, (0, 55, 90), (14, 255, 255)) | cv2.inRange(hsv, (168, 55, 90), (180, 255, 255))
     mask[:60, :] = 0
     cnt, labels, stats, cents = cv2.connectedComponentsWithStats(mask)
     best = max((i for i in range(1, cnt) if stats[i, cv2.CC_STAT_AREA] >= 250),
                key=lambda i: stats[i, cv2.CC_STAT_AREA], default=None)
     return cents[best] if best is not None else None
 
-def grasp_anchor(grip):
-    """Frame where the first sustained open run ends (closing onto block)."""
-    open_mask = grip >= OPEN_THRESH
-    run = 0
-    start = None
-    for t, o in enumerate(open_mask):
+def grasp_anchor(grip, merge_gap=10):
+    """Frame where the first sustained open run ends (closing onto block).
+    Runs separated by <= merge_gap frames are MERGED: v2 ep34 showed a
+    6-frame trigger flutter splitting one open phase into two runs, which
+    would anchor the grasp mid-flutter."""
+    runs, run = [], 0
+    for t, o in enumerate(grip >= OPEN_THRESH):
         if o:
             run += 1
-            if run == MIN_OPEN_RUN:
-                start = t - MIN_OPEN_RUN + 1
-            continue
-        if start is not None:
-            return t - 1, start   # first open run just ended at t-1
-        run = 0
-    return None, start
+        else:
+            if run >= MIN_OPEN_RUN:
+                runs.append([t - run, t - 1])
+            run = 0
+    if run >= MIN_OPEN_RUN:
+        runs.append([len(grip) - run, len(grip) - 1])
+    merged = []
+    for r in runs:
+        if merged and r[0] - merged[-1][1] <= merge_gap:
+            merged[-1][1] = r[1]
+        else:
+            merged.append(r)
+    if not merged:
+        return None, None
+    return merged[0][1], merged[0][0]
 
 points, poses, poses_deep, epids, skipped = [], [], [], [], []
 holds = []
-for ep in range(n):
+for ep in [e for e in range(n) if e not in (75, 85, 160, 162)]:
     a, b = int(eps["dataset_from_index"][ep]), int(eps["dataset_to_index"][ep])
     grip = states[a:b, 6]
     t_grasp, t_open = grasp_anchor(grip)
@@ -146,12 +155,14 @@ print("  p90   :", [round(float(v), 1) for v in np.percentile(E, 90, axis=0)])
 print("  max   :", [round(float(v), 1) for v in E.max(axis=0)])
 
 table = StagingTable.fit(pts, ps)
-for i, (hx, hy) in enumerate([(180, 260), (240, 260), (210, 295), (180, 330), (240, 330)], 1):
+for i, (hx, hy) in enumerate([(390, 260), (460, 260), (425, 290), (390, 320), (460, 320),
+                              (280, 260), (330, 380), (250, 410), (450, 410), (300, 190)], 1):
+    tag = ("H" if i <= 5 else "I") + str((i - 1) % 5 + 1)
     try:
         _, d = table.query(hx, hy)
-        print(f"  H{i}: {d:.0f}px answerable")
+        print(f"  {tag}: {d:.0f}px answerable")
     except Exception as e:
-        print(f"  H{i}: REFUSED {e}")
+        print(f"  {tag}: REFUSED {e}")
 table.write("/home/demo/Public/harnessvla-rebot-b601/b601/setup/staging_table.json")
 print("TABLE v4 WRITTEN")
 
