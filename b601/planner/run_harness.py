@@ -194,8 +194,20 @@ def main():
     results = []
     for trial in range(1, args.trials + 1):
         if not args.dry_run:
-            input(f"\n=== trial {trial}/{args.trials}: stage the block, park "
-                  "the arm, HANDS CLEAR, e-stop in reach. ENTER to start === ")
+            from b601.planner.trial_gate import trial_drift_check
+            while True:
+                input(f"\n=== trial {trial}/{args.trials}: stage the block, "
+                      "park the arm, HANDS CLEAR + OUT OF FRAME, e-stop in "
+                      "reach. ENTER to start === ")
+                # the start-of-session gate cannot see mid-session creep
+                # (measured: ~10 px between v1 same-evening sessions)
+                report = trial_drift_check(robot.get_observation)
+                print("  " + report.summary())
+                if report.passed:
+                    break
+                print("  trial REFUSED on a drifted mount — fix the camera "
+                      "(or deliberately re-record the reference + pins), "
+                      "then try again")
         recorder.start_trial(trial)
         io.start_trial_reference()
         policy.reset()
