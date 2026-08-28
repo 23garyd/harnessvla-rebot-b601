@@ -49,7 +49,7 @@ class PolicyStepper:
         cfg = PreTrainedConfig.from_pretrained(policy_path)
         cfg.pretrained_path = policy_path
         meta = LeRobotDatasetMetadata(
-            "local/b601_train", root=str(REPO / "datasets" / "b601_train"))
+            "local/b601_train_v2", root=str(REPO / "datasets" / "b601_train_v2"))
         self._features = meta.features
         self._policy = make_policy(cfg, ds_meta=meta)
         self._pre, self._post = make_pre_post_processors(
@@ -94,8 +94,8 @@ class FakeRobot:
         m = np.asarray(cfg["state_action_map"]["m"], dtype=float)
         c = np.asarray(cfg["state_action_map"]["c"], dtype=float)
         self._inv = lambda a: (np.asarray(a) - c) / m
-        ds = LeRobotDataset("local/b601_train",
-                            root=str(REPO / "datasets" / "b601_train"),
+        ds = LeRobotDataset("local/b601_train_v2",
+                            root=str(REPO / "datasets" / "b601_train_v2"),
                             tolerance_s=0.04)
         eps = ds.meta.episodes
         a = int(eps["dataset_from_index"][episode])
@@ -158,7 +158,7 @@ def main():
     ap.add_argument("--trials", type=int, default=1)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--policy", default=str(
-        REPO / "artifacts/act_b601_v1_20260812/checkpoints/100000/pretrained_model"))
+        REPO / "artifacts/act_b601_v2_20260828/checkpoints/100000/pretrained_model"))
     ap.add_argument("--policy-seconds", type=float, default=None,
                     help="override policy budget per attempt (dry-run tuning)")
     ap.add_argument("--out", default=str(REPO / "outputs" / "harness_trials"))
