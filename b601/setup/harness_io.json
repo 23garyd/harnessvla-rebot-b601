@@ -28,7 +28,8 @@
     "close_wait_s": 2.0,
     "from_attempt": 2
   },
-  "saucer": {"center": [464, 315], "radius_px": 30, "red_fraction_threshold": 0.20},
+  "saucer": {"center": [192, 181], "radius_px": 35, "red_fraction_threshold": 0.20,
+             "_provisional": "post-mount 2026-08-27: centre measured directly from the new view (blue-disk blob, 77x80 px extent); radius scaled to the closer view. Threshold carried from v1 (area-fraction is scale-invariant) — RECALIBRATE from v2 corpus end states before any counted run"},
   "verify_burst": 5,
   "verify_majority": 3,
   "policy_seconds_per_attempt": 40,

@@ -22,11 +22,26 @@ then the reference re-record.**
 
 Placement design — see `~/Desktop/v2_placement_map.jpg`:
 
+**Coordinates below are in the NEW (rigid-mount, 2026-08-27) camera frame.**
+The mount changed the view entirely (~450 px median tag displacement); the
+physical held-out region carries over via the four-tag homography
+(independently confirmed: the block left physically inside the zone lands
+inside the transformed box), the saucer was re-measured directly
+(homography carries ~20 px lens-distortion error at this closer view), and
+the interpolation points — arbitrary test choices, not physical fixtures —
+were redefined cleanly in the new frame.
+
 | Region | Rule during recording | Role at evaluation |
 |---|---|---|
-| **Extrapolation zone** (red): agentview (150,230)–(270,350) | NEVER place the block here | H1–H5 targets — the hard bound; expect low/zero primitive competence (v1's held-out result) |
-| **Interpolation disks** (orange): 25 px radius at I1 (320,260), I2 (390,320), I3 (300,380), I4 (470,220), I5 (360,180) | Do not place INSIDE a disk; placing near/around them is expected and good | I1–I5 targets — novel points inside demonstrated territory. This is where the harness thesis is falsifiable: a decent primitive has partial competence here, and retry/verify should multiply it |
-| Everywhere else on the mat | Place freely, spread evenly, vary orientation | Controls (C1–C5 as in v1) |
+| **Extrapolation zone** (red): agentview (365,148)–(475,255) [physical region carried from v1; ±20 px homography tolerance — exact eval target pixels re-measured at eval setup] | NEVER place the block here | H1–H5 targets — the hard bound; expect low/zero primitive competence (v1's held-out result) |
+| **Interpolation disks** (orange): 25 px radius at I1 (250,250), I2 (320,300), I3 (300,170), I4 (170,280), I5 (420,310) | Do not place INSIDE a disk; placing near/around them is expected and good | I1–I5 targets — novel points inside demonstrated territory. This is where the harness thesis is falsifiable: a decent primitive has partial competence here, and retry/verify should multiply it |
+| Everywhere else on the mat | Place freely, spread evenly, vary orientation | Controls (C1–C5, chosen at eval setup) |
+
+Saucer witness in the new frame: **(192,181)**, visual radius ~39 px
+(measured from the blue-disk blob). Note from the mount check: under
+DAYLIGHT the pinned exposure washes the red block to near-white
+(undetectable by the same HSV gate the audits use) — the evening-lighting
+rule is not just for the policy, it is what keeps perception alive.
 
 Session plan: 5 sessions × 40 episodes (the v1 pace). After each session the
 existing audit runs (alignment guard first, then behavioral checks) plus a
