@@ -114,12 +114,12 @@
   },
   "saucer": {
     "center": [
-      194,
-      186
+      167,
+      295
     ],
-    "radius_px": 38,
+    "radius_px": 37,
     "red_fraction_threshold": 0.2,
-    "_provisional": "final mount position 2026-08-27 22:4x: centre measured directly (blue disk 89x89 px), radius scaled. Threshold carried from v1 \u2014 RECALIBRATE from v2 corpus end states before any counted run"
+    "_provisional": "reference position 2026-08-27 (calibration 7709c9ef4715): centre measured directly (blue disk 86x84 px). Threshold carried from v1 \u2014 RECALIBRATE from v2 corpus end states before any counted run"
   },
   "verify_burst": 5,
   "verify_majority": 3,
