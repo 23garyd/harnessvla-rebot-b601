@@ -209,7 +209,9 @@ class LiveIO:
             gain=s["gain"], max_step_deg=s["max_step_deg"],
             max_total_deg=s["max_total_deg"], max_ticks=s["max_ticks"],
             stall_ticks=s["stall_ticks"], jx_pan=s["jx_pan"],
-            jy_reach=s["jy_reach"])
+            jy_elbow=s["jy_elbow"])
+        lead = float(s.get("lead_cap_deg", 5.0))
+        virt = None          # persistent command target, state space
         settle = 0
         while True:
             t0 = self._clock()
@@ -225,13 +227,23 @@ class LiveIO:
                 obs.get("eye_in_hand")))
             if step is None:
                 return servo.converged
-            d_pan, d_reach = step
+            d_pan, d_elbow = step
             state = self._state_vec(obs)
-            target = state.copy()
-            target[0] += d_pan
-            target[1] += d_reach / 2.0     # reach split across lift+elbow
-            target[2] += d_reach / 2.0
-            self._send(self._sam.to_action(target))
+            # PERSISTENT target, never re-anchored to the measured state:
+            # re-anchoring ratified gravity droop at the deep pose (-19 deg
+            # of never-commanded reach motion in one 50-tick live run) and
+            # kept the sticky pan axis on a 1-deg leash it barely followed
+            # (-4 deg achieved of -25 commanded). The lead cap bounds how
+            # far the command may run ahead of the arm, inside the healthy
+            # command-state gap the divergence guard was calibrated on.
+            if virt is None:
+                virt = state.copy()
+            virt[0] += d_pan
+            virt[2] += d_elbow   # elbow ALONE moves image y (+10.2 px/deg
+            #                      deep); the old lift+elbow split
+            #                      self-cancelled (lift opposes at -3.75)
+            virt = np.clip(virt, state - lead, state + lead)
+            self._send(self._sam.to_action(virt))
             rest = self._dt - (self._clock() - t0)
             if rest > 0:
                 self._sleep(rest)

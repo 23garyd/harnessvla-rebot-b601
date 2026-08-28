@@ -167,7 +167,7 @@ class TestServoController:
         cfg = dict(target=(360.0, 404.0), tolerance_px=25.0,
                    gain=0.5, max_step_deg=1.5, max_total_deg=12.0,
                    max_ticks=120, stall_ticks=30,
-                   jx_pan=-12.8, jy_reach=2.5)
+                   jx_pan=-12.8, jy_elbow=2.5)
         cfg.update(kw)
         return ServoController(**cfg)
 

@@ -115,10 +115,13 @@ class ServoController:
     """Wrist-image servo toward the demonstrated pre-grasp view.
 
     After the open-loop stage, the block's centroid in the wrist frame is
-    driven to the corpus target (median (360,404) at t_grasp-10, n=84) using
-    the measured coupling: pan ~ -12.8 px/deg on image x; a lift+elbow
-    'reach' direction ~ +2.5 px/deg on image y. Feedback at every tick
-    forgives the Jacobian's noise (R2 0.47) — only the signs must hold.
+    driven to the corpus target using the measured coupling: pan on image x
+    (v2 per-joint fit: -12.2 px/deg approach, -14.3 deep), ELBOW ALONE on
+    image y (+13.3 approach, +10.2 deep, R2 0.48-0.54). The old lift+elbow
+    'reach' split self-cancelled: lift and elbow OPPOSE on image y
+    (-3.75 vs +10.23 px/deg at depth), which is why the 2026-08-28 recovery
+    shakedown burned 40+ deg of joint motion for ~0 px of y progress.
+    Feedback each tick forgives the fit's noise — only the signs must hold.
 
     Best-effort by contract: returns None to STOP (converged, block lost,
     stalled, or budget spent) and the caller proceeds either way. Danger is
@@ -126,7 +129,7 @@ class ServoController:
     """
 
     def __init__(self, target, tolerance_px, gain, max_step_deg,
-                 max_total_deg, max_ticks, stall_ticks, jx_pan, jy_reach):
+                 max_total_deg, max_ticks, stall_ticks, jx_pan, jy_elbow):
         self._target = (float(target[0]), float(target[1]))
         self._tol = float(tolerance_px)
         self._gain = float(gain)
@@ -134,14 +137,14 @@ class ServoController:
         self._budget = [float(max_total_deg), float(max_total_deg)]
         self._max_ticks = int(max_ticks)
         self._stall_ticks = int(stall_ticks)
-        self._j = (float(jx_pan), float(jy_reach))
+        self._j = (float(jx_pan), float(jy_elbow))
         self._ticks = 0
         self._best_err = None
         self._stall = 0
         self.converged = False
 
     def step(self, centroid):
-        """centroid (cx, cy) or None -> (d_pan, d_reach) in degrees, or
+        """centroid (cx, cy) or None -> (d_pan, d_elbow) in degrees, or
         None to stop. Latches after any stop."""
         if self.converged or self._ticks >= self._max_ticks:
             return None
@@ -163,12 +166,12 @@ class ServoController:
                 return None
         d_pan = max(-self._max_step,
                     min(self._max_step, ex / self._j[0] * self._gain))
-        d_reach = max(-self._max_step,
+        d_elbow = max(-self._max_step,
                       min(self._max_step, ey / self._j[1] * self._gain))
         d_pan = max(-self._budget[0], min(self._budget[0], d_pan))
-        d_reach = max(-self._budget[1], min(self._budget[1], d_reach))
-        if abs(d_pan) < 1e-9 and abs(d_reach) < 1e-9:
+        d_elbow = max(-self._budget[1], min(self._budget[1], d_elbow))
+        if abs(d_pan) < 1e-9 and abs(d_elbow) < 1e-9:
             return None
         self._budget[0] -= abs(d_pan)
-        self._budget[1] -= abs(d_reach)
-        return d_pan, d_reach
+        self._budget[1] -= abs(d_elbow)
+        return d_pan, d_elbow
