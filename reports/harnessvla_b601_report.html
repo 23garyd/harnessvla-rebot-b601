@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>HarnessVLA on Real Hardware — Experiment Report</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: #1a1a1a;
+         font-size: 10.5pt; line-height: 1.45; max-width: 175mm; margin: 0 auto; }
+  h1 { font-size: 20pt; margin: 0 0 2mm; line-height: 1.2; }
+  h2 { font-size: 14pt; border-bottom: 1.5pt solid #333; padding-bottom: 1mm;
+       margin: 9mm 0 3mm; page-break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 2mm; page-break-after: avoid; }
+  .subtitle { color: #555; font-size: 11pt; margin-bottom: 6mm; }
+  table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 3mm 0;
+          font-family: Helvetica, Arial, sans-serif; page-break-inside: avoid; }
+  th { background: #eee; text-align: left; }
+  th, td { border: 0.5pt solid #999; padding: 1.2mm 2mm; vertical-align: top; }
+  .pass { background: #e4f2e4; font-weight: bold; }
+  .fail { background: #f6e4e4; }
+  .void { color: #888; }
+  figure { margin: 4mm 0; page-break-inside: avoid; text-align: center; }
+  figure img { max-width: 100%; border: 0.5pt solid #ccc; }
+  figcaption { font-size: 8.5pt; color: #444; margin-top: 1.5mm; text-align: left;
+               font-family: Helvetica, Arial, sans-serif; }
+  code { font-family: 'DejaVu Sans Mono', monospace; font-size: 8.5pt;
+         background: #f2f2f2; padding: 0 1mm; }
+  .headline { border: 1pt solid #333; background: #f7f7f2; padding: 3mm 4mm; margin: 4mm 0; }
+  .headline table { margin: 2mm 0 0; }
+  .note { font-size: 9pt; color: #444; border-left: 2.5pt solid #999;
+          padding: 1mm 3mm; margin: 3mm 0; background: #fafafa; }
+  .pagebreak { page-break-before: always; }
+  ul, ol { margin: 2mm 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1mm; }
+  .videoref { font-family: 'DejaVu Sans Mono', monospace; font-size: 7.5pt; }
+</style>
+</head>
+<body>
+
+<h1>A Planner Harness Around a Frozen ACT Policy:<br>Real-Hardware Results on the reBot B601-RS</h1>
+<div class="subtitle">
+Project <b>harnessvla-rebot-b601</b> — reproduction test of the HarnessVLA thesis on physical hardware.<br>
+Task: <i>“pick up the red block and place it in the bowl.”</i>
+Period: 2026-07-31 to 2026-08-27. Report generated 2026-08-27.
+</div>
+
+<div class="headline">
+<b>Headline result.</b> The harness did <b>not</b> rescue the frozen policy at held-out block positions
+(<b>0 of 11</b> harness trials vs the <b>0 of 10</b> bare-policy baseline). Delivery quality was progressively
+eliminated as the cause: even staged and centered starts a few centimeters from the block produced zero grasps
+in the held-out region. The bottleneck is the frozen policy’s own final approach where it never saw data.
+The harness did demonstrate two genuine capabilities: <b>one fully autonomous save</b>
+(grasp verified, placement completed deterministically after the policy failed to place) and a success at a
+control position the bare policy had failed on Day&nbsp;14. Its verification layer produced
+<b>zero false successes in 16 field trials</b>.
+<table>
+<tr><th></th><th>In-distribution (controls / training area)</th><th>Held-out zone</th><th>Safety events</th></tr>
+<tr><td><b>Bare frozen policy</b> (Day-14 counted run, n=15)</td><td>3 / 5 (60%)</td><td><b>0 / 10</b></td><td>0 (counted run)</td></tr>
+<tr><td><b>Harness</b> (shakedowns 1–5, n=16)</td><td>4 / 7 (57%)</td><td><b>0 / 11</b></td><td>0</td></tr>
+</table>
+</div>
+
+<h2>1. Setup</h2>
+<p>
+A Seeed reBot B601-RS follower arm (CAN, six arm joints + gripper) with a leader arm for teleoperation,
+a fixed top-view webcam (<code>agentview</code>, 640×480@30) and a wrist-mounted RealSense D405 in color-only mode
+(<code>eye_in_hand</code>). One red 40&nbsp;mm block, one saucer fixed at a witness mark (agentview pixel (464,315)).
+The workspace carries four ArUco landmarks; every session passes a gate stack: version pins, camera reset + settings
+re-application (D405 one-session-per-reset firmware behavior), a geometric drift gate (≤3&nbsp;px), and a backup-target check.
+A lighting-parity rule (train and evaluate under the same evening lighting) was added after a 13-trial evaluation
+was voided by afternoon glare that washed the block out of the policy’s color distribution.
+</p>
+<p>
+<b>Training corpus:</b> 168 verified teleoperated episodes (96,058 frames), block placed freely across the mat with a
+rectangular <b>held-out zone</b> — agentview (150,230)–(270,350) — deliberately never demonstrated.
+<b>Primitive:</b> ACT (52M parameters) trained 100k steps to loss 0.062 (checkpoint
+<code>artifacts/act_b601_v1_20260812/checkpoints/100000</code>), then <b>frozen</b>.
+All motion after Day&nbsp;14 runs under a per-joint command-rate limiter derived from the demonstrated envelope and a
+divergence guard (abort on |command−state| sustained &gt;15° for 1&nbsp;s), added after a policy-driven velocity-snap
+event broke a trial and tripped the PSU.
+</p>
+
+<figure>
+<img src="assets/targets_map.jpg" style="max-width:78%">
+<figcaption><b>Fig. 1 — Placement map.</b> Held-out targets H1–H5 lie inside the never-demonstrated zone
+(upper-left region of the mat); controls C1–C5 lie in demonstrated territory. Saucer at the witness mark (right).
+The trial order stamped on the map is the <i>pre-planned</i> sequence; the order actually run is the one recorded
+in the Section 2 table.</figcaption>
+</figure>
+
+<h2>2. Baseline: the frozen policy alone (Day-14)</h2>
+<p>
+Protocol: 15 operator-initiated trials, interleaved held-out/controls, 40&nbsp;s per trial, scored on
+“block ends in the saucer.” Redos were declared before running. Result: <b>held-out 0/10, controls 3/5 — gate
+(≥70% held-out) FAILED</b>, freezing the primitive per plan and motivating the harness.
+</p>
+<table>
+<tr><th>#</th><th>Target</th><th>Result</th><th>Video (dataset <code>local/eval_b601_v1</code>)</th></tr>
+<tr class="fail"><td>1</td><td>H3</td><td>fail</td><td class="videoref">episode 16</td></tr>
+<tr class="pass"><td>2</td><td>C1</td><td>PASS</td><td class="videoref">episode 17 (sustained held-verdicts confirm carry)</td></tr>
+<tr class="fail"><td>3</td><td>H2</td><td>fail</td><td class="videoref">episode 18</td></tr>
+<tr class="fail"><td>4</td><td>C2</td><td>fail</td><td class="videoref">episode 19</td></tr>
+<tr class="fail"><td>5</td><td>H3</td><td>fail</td><td class="videoref">episode 20</td></tr>
+<tr class="fail"><td>6</td><td>H4</td><td>fail</td><td class="videoref">episode 21</td></tr>
+<tr class="fail"><td>7</td><td>C3</td><td>fail</td><td class="videoref">episode 22</td></tr>
+<tr class="fail"><td>8</td><td>H5</td><td>fail</td><td class="videoref">episode 23</td></tr>
+<tr class="fail"><td>9</td><td>H1</td><td>fail</td><td class="videoref">episode 24 (C4 accidental-reset redo sits nearby; C4 pass anchored at ep. 25)</td></tr>
+<tr class="pass"><td>10</td><td>C4</td><td>PASS</td><td class="videoref">episode 25 (held-verdicts confirm)</td></tr>
+<tr class="fail"><td>11</td><td>H2</td><td>fail</td><td class="videoref">episode 26</td></tr>
+<tr class="fail"><td>12</td><td>H3</td><td>fail</td><td class="videoref">episode 27</td></tr>
+<tr class="pass"><td>13</td><td>C5</td><td>PASS</td><td class="videoref">episode 28 (held-verdicts confirm; ends early on success)</td></tr>
+<tr class="fail"><td>14</td><td>H4</td><td>fail</td><td class="videoref">episode 29</td></tr>
+<tr class="fail"><td>15</td><td>H5</td><td>fail</td><td class="videoref">episode 30</td></tr>
+</table>
+<p class="note">
+Episodes 0–12 of the same dataset are the <b>lighting-voided</b> first attempt (afternoon glare; drift gate is blind to
+photometrics — now a standing rule). Episodes 13–15 are the night session containing the first-ever policy success
+(C1) and the H2 velocity-snap safety event that led to the rate limiter. The trial↔episode mapping for passes is
+independently confirmed by the grasp verifier’s sustained held-verdicts appearing in exactly the three pass episodes
+(17, 25, 28) and in none of the fails or voided trials.
+</p>
+
+<h2 class="pagebreak">3. The harness</h2>
+<p>
+Loop per trial: <b>look</b> (agentview red-blob localization on the drift-gated frame) → <b>stage</b> (block pixel →
+pre-grasp joint pose from a table built out of the corpus itself) → <b>invoke</b> the frozen policy (40&nbsp;s budget) →
+<b>lift to a verify pose</b> → <b>verify</b> (wrist-camera + gripper-band check, majority of a 5-frame burst) →
+branch: success / deterministic place recovery (saucer never moves) / re-ground and retry, ≤3 attempts, then a graceful
+give-up. Every command — staged moves and policy alike — passes the rate limiter and divergence guard. All components
+were test-driven offline before live use:
+</p>
+<ul>
+<li><b>Staging table</b> (v4): 112 pixel→pose pairs anchored at the visually verified grasp moment; positional
+leave-one-out error median ~5°/joint, p90 ≤12° inside coverage. Wrist roll is unpredictable from the top view
+(block orientation is random; r=−0.2) and is neutralized — orientation is the policy’s job.</li>
+<li><b>Grasp verifier:</b> red-region + gripper hold-band (measured: holds 121–186, closed-on-air 0–30, open ~270);
+416/417 corpus hold frames verified held, 0/336 false holds on hard negatives; measured blind spot (low hover beside
+an un-grasped block) closed procedurally by verifying only after a lift.</li>
+<li><b>Live wiring:</b> a fitted state↔action map (three joints are sign-flipped between spaces), fixed poses from
+corpus medians, and full telemetry. Dry-run with the real checkpoint: zero rate-limit violations across 3,878
+consecutive commands.</li>
+</ul>
+<figure>
+<img src="assets/anchor_check.jpg">
+<figcaption><b>Fig. 2 — The grasp anchor, verified against pixels.</b> Wrist frames at the detected closure onset for
+six corpus episodes: open fingers at the block in every spot-check. An earlier version of this anchor read the gripper
+convention backwards and passed every self-referential statistic while being wrong in 147/168 episodes — the origin of
+the project rule that anchors must be validated against pixels, not their own consistency.</figcaption>
+</figure>
+
+<h2>4. Harness field trials (shakedowns 1–5, 16 trials)</h2>
+<p class="note"><b>Protocol caveat, stated up front:</b> these were iterative debugging rounds, not a matched counted
+protocol. The harness configuration changed between rounds (each change evidence-driven and committed), the operator’s
+position changed after round 1, and no Day-18 counted comparison was run. The aggregate numbers are therefore
+indicative, not confirmatory.</p>
+
+<h3>Round 1 — 5 trials (4 training-area, 1 held-out): 2 passes, and a confound discovered</h3>
+<p>
+Both passes were the policy completing the task from the staged start — including at a position near C2,
+<b>which the bare policy had failed on Day&nbsp;14</b>. But telemetry showed every trial began with the policy
+<i>retreating</i> from the staged pose. GPU occlusion probes on the frozen policy isolated the trigger to a
+107×120&nbsp;px agentview region containing <b>the operator’s arm leaning over the mat</b>: swapping that one patch
+flips the policy’s plan between RETREAT and CONTINUE (state, gripper and wrist-roll hypotheses were counterfactually
+refuted). Mechanism: corpus episode tails contain the operator reaching in after the place, so “person near mat”
+became a learned end-of-episode cue. Standing rule since: operator out of frame whenever the policy drives.
+</p>
+<figure>
+<img src="assets/operator_compare.jpg" style="max-width:88%">
+<figcaption><b>Fig. 3 — The observation the policy retreats from (right) vs a demonstration (left).</b>
+Top: agentview; bottom: wrist. The decisive difference is in the agentview’s top-right corner.</figcaption>
+</figure>
+<figure>
+<img src="assets/operator_crop.jpg" style="max-width:60%">
+<figcaption><b>Fig. 4 — The trigger patch.</b> Left: shakedown trial (operator’s arm over the mat edge).
+Right: same region in a demonstration. Replacing only this patch flips the policy’s 40-step plan from
+retreat-and-close to continue-and-grasp.</figcaption>
+</figure>
+<figure>
+<img src="assets/s1_retreat.jpg" style="max-width:88%">
+<figcaption><b>Fig. 5 — Round-1 wrist views.</b> Rows: trials 1, 2, 3, 5; columns: stage-end, policy+3s, closing moment,
+policy end. Staging delivers the block into view (col. 1); the policy first pulls away (col. 2), re-approaches on its
+own, and closes centimeters off in the failures (col. 3). Videos:
+<span class="videoref">outputs/harness_trials/20260822_213019/trial_00N_*.mp4</span></figcaption>
+</figure>
+
+<h3 class="pagebreak">Round 2 — 4 trials, operator out of frame: retreat gone, first harness save</h3>
+<p>
+5 of 7 policy segments now continued directly from the staged pose (0 of 7 in round 1). Trial 2 is the
+harness thesis working end to end: the policy grasped but failed to place; the verifier read HELD; the deterministic
+place recovery scored it. Trial 3 was a clean policy success. The two failures (one training-area, one held-out)
+were near-deterministic grasp misses a few centimeters off, repeated identically across retries.
+</p>
+<figure>
+<img src="assets/s2_t2_save.jpg" style="max-width:80%">
+<figcaption><b>Fig. 6 — The autonomous save (round 2, trial 2).</b> Policy grasps; verify pose reads HELD (majority of
+burst); the harness places deterministically; saucer check confirms. Video:
+<span class="videoref">outputs/harness_trials/20260822_225234/trial_002_*.mp4</span></figcaption>
+</figure>
+
+<h3>Rounds 3–4 — 6 held-out trials: 0/6; two motion defects fixed, then the real limit exposed</h3>
+<p>
+Round 3 failed on two compounding motion defects, both operator-reported and telemetry-confirmed: staged approaches ran
+at half the safety envelope (which is the 99.9th-percentile of demonstrated speed — half of that is still a lunge), and
+the open-loop move let the arm arrive before the slow gripper had opened, plowing closed fingers into the cube. Fixes:
+open-first staging (closed-loop on physical gripper state) and quarter-envelope approach speed.
+Round 4 then isolated the deeper problem: with motion clean, all nine staged poses in the held-out hole missed by
+centimeters in varying directions — <b>open-loop extrapolation cannot stage where no demonstration went</b> —
+while the block sat in the wrist camera’s view in nine of nine attempts.
+</p>
+<figure>
+<img src="assets/sd4_stageends.jpg" style="max-width:88%">
+<figcaption><b>Fig. 7 — Round-4 stage-end wrist views, all nine attempts.</b> The block is visible every time but
+never centered under the fingers; each subsequent tap knocked it deeper into un-demonstrated territory
+(e.g. trial 2: pixel x 248→139). Videos:
+<span class="videoref">outputs/harness_trials/20260823_003854/trial_00N_*.mp4</span></figcaption>
+</figure>
+
+<h3>Round 5 — 3 held-out trials with a wrist-image servo: 0/3, and the strategic finding</h3>
+<p>
+A feedback servo (drive the block’s wrist-frame centroid to the demonstrated pre-grasp target) was added after round 4.
+Its first field version under-acted — budget exhaustion and stale-image oscillation, both visible in the traces — but
+the round still produced the decisive datum: two attempts ended with the shoved cube 7–10&nbsp;px from demonstrated
+coverage, staging essentially perfect, <b>and the policy still missed</b>. Across rounds 2–5 the frozen policy made
+~15 grasp attempts at or near held-out positions with zero grasps. Delivery quality is not the bottleneck;
+<b>the policy’s final five centimeters are miscalibrated where it never saw data</b>, and staging/retries multiply a
+per-attempt probability that is approximately zero there.
+</p>
+<figure>
+<img src="assets/sd5_key.jpg">
+<figcaption><b>Fig. 8 — Round-5 wrist views.</b> Servo-end and gripper-close moments per attempt: the cube remains
+off-center at servo exit, and the fingers close on empty mat. Videos:
+<span class="videoref">outputs/harness_trials/20260824_220727/trial_00N_*.mp4</span></figcaption>
+</figure>
+
+<h2 class="pagebreak">5. Synthesis</h2>
+<table>
+<tr><th>Measure</th><th>Bare policy (Day-14)</th><th>Harness (rounds 1–5)</th></tr>
+<tr><td>Held-out success</td><td>0 / 10</td><td>0 / 11</td></tr>
+<tr><td>In-distribution success</td><td>3 / 5</td><td>4 / 7 (one via autonomous save; one at a Day-14-failing position)</td></tr>
+<tr><td>False “success” declarations</td><td>n/a (human-scored)</td><td>0 / 16 (verifier + saucer check)</td></tr>
+<tr><td>Safety events</td><td>0 in counted run (1 in prior night session, pre-limiter)</td><td>0 across all 16 trials</td></tr>
+<tr><td>Damage-free give-ups</td><td>n/a (fixed 40 s timeout)</td><td>12 / 12 failures ended in a graceful, homed give-up</td></tr>
+</table>
+<p><b>On the HarnessVLA thesis.</b> The thesis predicts that staging, verification, re-grounding and retries make an
+imperfect frozen primitive substantially more reliable. On this rig, with this 168-episode ACT primitive:</p>
+<ol>
+<li><b>Unsupported for positional generalization.</b> The primitive’s held-out failure is not a delivery problem the
+harness can stage away — it is a visuomotor calibration hole. Four progressively better delivery mechanisms
+(open-loop staging, deep staging, slow open-first approach, image servo) all met the same 0%.</li>
+<li><b>Supported for verification and recovery.</b> The verify→recover path converted one real failure into a success,
+never declared a false success, and every failure terminated safely. In a longer counted run these are the properties
+that would compound.</li>
+<li><b>The diagnosis machinery is a result in itself.</b> The occlusion-probe finding — a frozen imitation policy
+treating a visible operator as an end-of-episode cue — was invisible to every gate built for this project
+(drift, lighting, pins) and is a concrete, reproducible example of scene-level spurious correlation in
+behavior-cloned policies.</li>
+</ol>
+
+<h2>6. Limitations</h2>
+<ul>
+<li>The harness numbers come from debugging rounds, not a matched protocol; configuration changed between rounds.
+The planned Day-18 counted comparison was not run (owner decision, 2026-08-27).</li>
+<li>Sample sizes are small throughout (10–16 trials per condition).</li>
+<li>Whether the operator-in-frame confound also depressed the Day-14 baseline is <i>inconclusive</i>
+(the skin-hue check cannot separate the operator from a cardboard box in the frame corner).</li>
+<li>The final harness capability — a recovery grasp that servo-centers, descends the measured demo depth and closes to
+the measured stall band after a verified policy failure — was built, unit-tested and dry-run-validated
+(commit <code>5dbecc0</code>) but <b>never tested on hardware</b>. It is the designed next experiment, not a result.</li>
+</ul>
+
+<h2>7. Record</h2>
+<p>
+Full provenance lives in the repository registries: <code>b601/registry/experiment_registry.md</code> (every run and
+decision), <code>risk_log.md</code> (failure modes and standing guards, including the orphan-row index corruption, the
+photometric blindness rule, the velocity-snap safety event, the self-consistent-but-wrong anchor lesson, and the
+operator-in-frame confound), and <code>protocol_deviations.md</code> (five vendor patches, each committed and re-pinned).
+The unpowered test suite stands at 570 tests. All trial telemetry (per-tick command/state JSONL + both camera MP4s per
+trial) is under <code>outputs/harness_trials/</code>, backed up to <code>/mnt/nvme3/b601/harness_trials/</code>;
+evaluation datasets under <code>datasets/eval_b601_v1</code> (backed up likewise).
+</p>
+<table>
+<tr><th>Session</th><th>Directory / dataset</th><th>Trials</th><th>Outcome</th></tr>
+<tr><td>Day-14 voided (lighting)</td><td class="videoref">datasets/eval_b601_v1 eps 0–12</td><td>13</td><td class="void">voided</td></tr>
+<tr><td>Day-14 night (pre-limiter)</td><td class="videoref">datasets/eval_b601_v1 eps 13–15</td><td>3</td><td>C1 first pass; H2 safety event</td></tr>
+<tr><td>Day-14 counted</td><td class="videoref">datasets/eval_b601_v1 eps 16–30</td><td>15</td><td>held-out 0/10, controls 3/5</td></tr>
+<tr><td>Shakedown 1</td><td class="videoref">outputs/harness_trials/20260822_213019</td><td>5</td><td>2 pass (training area)</td></tr>
+<tr><td>Shakedown 2</td><td class="videoref">outputs/harness_trials/20260822_225234</td><td>4</td><td>2 pass (incl. autonomous save)</td></tr>
+<tr><td>Shakedown 3</td><td class="videoref">outputs/harness_trials/20260823_002500</td><td>3</td><td>0 pass (motion defects)</td></tr>
+<tr><td>Shakedown 4</td><td class="videoref">outputs/harness_trials/20260823_003854</td><td>3</td><td>0 pass (extrapolation limit)</td></tr>
+<tr><td>Shakedown 5</td><td class="videoref">outputs/harness_trials/20260824_220727</td><td>3</td><td>0 pass (strategic finding)</td></tr>
+</table>
+
+</body>
+</html>
