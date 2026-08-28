@@ -154,7 +154,7 @@ class ServoController:
             self.converged = True
             return None
         err = (ex * ex + ey * ey) ** 0.5
-        if self._best_err is None or err < self._best_err - 2.0:
+        if self._best_err is None or err < self._best_err - 1.0:
             self._best_err = min(err, self._best_err or err)
             self._stall = 0
         else:

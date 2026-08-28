@@ -90,12 +90,12 @@
       387,
       395
     ],
-    "tolerance_px": 25.0,
-    "gain": 0.2,
+    "tolerance_px": 15.0,
+    "gain": 0.3,
     "max_step_deg": 1.0,
     "max_total_deg": 25.0,
-    "max_ticks": 240,
-    "stall_ticks": 45,
+    "max_ticks": 360,
+    "stall_ticks": 60,
     "jx_pan": -12.8,
     "jy_reach": 2.5
   },
@@ -134,6 +134,6 @@
     "poses": "v2 corpus medians (n=201 park / 183 verify+place)",
     "saucer": "success = red fraction inside the 30 px disk at (464,315) >= 0.20; placed blocks read 0.30-0.63 (p5 0.302 healthy), trial starts 0.000; LOCAL check because skin passes the red gate (ep24's hand)",
     "verify": "burst majority 3/5 at the verify pose ONLY (low-hover blind spot, eval eps 21/29)",
-    "servo": "v2 target (387,395) median wrist centroid at t_grasp-10, n~95, p10-p90 +-35px; coupling gains carried from v1 (same wrist camera)"
+    "servo": "v2 target (387,395) median wrist centroid at t_grasp-10, n~95, p10-p90 +-35px; coupling gains carried from v1 (same wrist camera) | 2026-08-28 recovery diagnosis: 4/5 recovery servos under-converged (act-every-3rd + stall-on-skipped starved authority to ~17 corrections); now act every 2nd tick, gain 0.3, 360 ticks, stall 60 acted-steps, tol 15px (T12 edge-grip slip at 25px)"
   }
 }

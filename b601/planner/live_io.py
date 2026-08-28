@@ -214,10 +214,10 @@ class LiveIO:
         while True:
             t0 = self._clock()
             obs = self._obs()
-            # act on every 3rd tick: the wrist image lags the command by
+            # act on every 2nd tick: the wrist image lags the command by
             # ~2-3 frames, and correcting against a stale view is what
             # oscillated in shakedown-5 (4-5 pan direction flips)
-            settle = (settle + 1) % 3
+            settle = (settle + 1) % 2
             if settle != 0:
                 self._sleep(self._dt)
                 continue
