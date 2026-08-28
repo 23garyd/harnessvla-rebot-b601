@@ -22,7 +22,7 @@ then the reference re-record.**
 
 Placement design — see `~/Desktop/v2_placement_map.jpg`:
 
-**Coordinates below are in the NEW (rigid-mount, 2026-08-27) camera frame.**
+**Coordinates below are in the FINAL (rigid-mount, tilted down to crop the operator, settled + re-referenced 2026-08-27) camera frame.**
 The mount changed the view entirely (~450 px median tag displacement); the
 physical held-out region carries over via the four-tag homography
 (independently confirmed: the block left physically inside the zone lands
@@ -33,11 +33,11 @@ were redefined cleanly in the new frame.
 
 | Region | Rule during recording | Role at evaluation |
 |---|---|---|
-| **Extrapolation zone** (red): agentview (365,148)–(475,255) [physical region carried from v1; ±20 px homography tolerance — exact eval target pixels re-measured at eval setup] | NEVER place the block here | H1–H5 targets — the hard bound; expect low/zero primitive competence (v1's held-out result) |
-| **Interpolation disks** (orange): 25 px radius at I1 (250,250), I2 (320,300), I3 (300,170), I4 (170,280), I5 (420,310) | Do not place INSIDE a disk; placing near/around them is expected and good | I1–I5 targets — novel points inside demonstrated territory. This is where the harness thesis is falsifiable: a decent primitive has partial competence here, and retry/verify should multiply it |
+| **Extrapolation zone** (red): agentview (399,134)–(518,251) [physical region carried from v1; ±20 px homography tolerance — exact eval target pixels re-measured at eval setup] | NEVER place the block here | H1–H5 targets — the hard bound; expect low/zero primitive competence (v1's held-out result) |
+| **Interpolation disks** (orange): 25 px radius at I1 (300,220), I2 (380,300), I3 (250,300), I4 (170,260), I5 (460,320) | Do not place INSIDE a disk; placing near/around them is expected and good | I1–I5 targets — novel points inside demonstrated territory. This is where the harness thesis is falsifiable: a decent primitive has partial competence here, and retry/verify should multiply it |
 | Everywhere else on the mat | Place freely, spread evenly, vary orientation | Controls (C1–C5, chosen at eval setup) |
 
-Saucer witness in the new frame: **(192,181)**, visual radius ~39 px
+Saucer witness in the FINAL frame: **(194,186)**, visual radius ~45 px
 (measured from the blue-disk blob). Note from the mount check: under
 DAYLIGHT the pinned exposure washes the red block to near-white
 (undetectable by the same HSV gate the audits use) — the evening-lighting
