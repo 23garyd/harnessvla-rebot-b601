@@ -75,6 +75,9 @@ class FakeIO:
     def place_recover(self):
         self._call("place_recover")
 
+    def recovery_grasp(self):
+        self._call("recovery_grasp")
+
     def go_home(self):
         self._call("go_home")
 
@@ -203,6 +206,44 @@ class TestDeepRetry:
         Harness(make_table(), io, max_attempts=2).run_trial()
         assert len(staged) == 2
         assert staged[0] == staged[1]   # same pixel, same table, same pose
+
+
+class TestRecoveryGrasp:
+    """After a VERIFIED policy failure, the harness grasps by itself
+    (attempts >= recovery_from_attempt). The policy always gets the first
+    attempt — the primitive is invoked before the harness takes over."""
+
+    def test_policy_first_then_recovery(self):
+        io = FakeIO(saucer=[False], verify=[EMPTY])
+        r = run(io, recovery_from_attempt=2, max_attempts=3)
+        assert r.outcome == "gave_up"
+        assert io.log.count("invoke_policy") == 1
+        assert io.log.count("recovery_grasp") == 2
+        # policy attempt strictly before any recovery
+        assert io.log.index("invoke_policy") < io.log.index("recovery_grasp")
+
+    def test_recovery_off_by_default(self):
+        io = FakeIO(saucer=[False], verify=[EMPTY])
+        run(io, max_attempts=3)
+        assert io.log.count("invoke_policy") == 3
+        assert io.log.count("recovery_grasp") == 0
+
+    def test_recovery_success_places_and_wins(self):
+        # attempt 1 (policy) fails empty; attempt 2 (recovery) verifies HELD,
+        # place recovery empties the gripper, saucer confirms
+        io = FakeIO(saucer=[False, True],
+                    verify=[EMPTY, HELD, EMPTY])
+        r = run(io, recovery_from_attempt=2, verify_burst=1,
+                verify_majority=1)
+        assert r.outcome == "success"
+        assert io.log.count("recovery_grasp") == 1
+        assert "place_recover" in io.log
+
+    def test_recovery_attempts_still_recorded(self):
+        io = FakeIO(saucer=[False], verify=[EMPTY])
+        r = run(io, recovery_from_attempt=2, max_attempts=2)
+        assert len(r.attempts) == 2
+        assert r.attempts[1].reason.startswith("recovery")
 
 
 class TestRecords:

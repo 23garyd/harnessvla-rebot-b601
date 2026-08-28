@@ -195,11 +195,14 @@ class LiveIO:
         the demonstrated pre-grasp target. The open-loop table misses by cm
         in the held-out hole (shakedown-4: nine of nine attempts) while the
         block was in the wrist view every time. Best-effort: any stop
-        condition proceeds to the policy — danger stays the guard's job."""
+        condition proceeds — danger stays the guard's job.
+
+        Returns True iff the servo CONVERGED (block centred within
+        tolerance); the recovery grasp requires that, the policy does not."""
         from b601.planner.io_support import ServoController
         s = self._cfg.get("servo")
         if not s:
-            return
+            return False
         self._phase = "servo"
         servo = ServoController(
             target=tuple(s["target"]), tolerance_px=s["tolerance_px"],
@@ -207,13 +210,21 @@ class LiveIO:
             max_total_deg=s["max_total_deg"], max_ticks=s["max_ticks"],
             stall_ticks=s["stall_ticks"], jx_pan=s["jx_pan"],
             jy_reach=s["jy_reach"])
+        settle = 0
         while True:
             t0 = self._clock()
             obs = self._obs()
+            # act on every 3rd tick: the wrist image lags the command by
+            # ~2-3 frames, and correcting against a stale view is what
+            # oscillated in shakedown-5 (4-5 pan direction flips)
+            settle = (settle + 1) % 3
+            if settle != 0:
+                self._sleep(self._dt)
+                continue
             step = servo.step(perception.wrist_block_pixel(
                 obs.get("eye_in_hand")))
             if step is None:
-                return
+                return servo.converged
             d_pan, d_reach = step
             state = self._state_vec(obs)
             target = state.copy()
@@ -254,6 +265,38 @@ class LiveIO:
         # (the block must actually leave the fingers before the lift)
         self._open_gripper_and_wait("release")
         self._sleep(0.5)
+
+    def recovery_grasp(self):
+        """The harness grasps by itself after a verified policy failure:
+        re-servo (fresh budget) and REQUIRE convergence, apply the measured
+        demo descend (t_grasp-10 -> t_grasp median, <1 deg — the deep stage
+        is already at grasp depth), close until the gripper stalls on the
+        block (demos: trough ~151), and hand back to the normal lift+verify.
+        No convergence = no descend and no close: verify will read empty and
+        the loop re-grounds. Every quantity here is measured, not tuned."""
+        r = self._cfg["recovery"]
+        if not self._servo_to_pregrasp():
+            return
+        obs = self._obs()
+        state = self._state_vec(obs)
+        target = state.copy()
+        target[:6] += np.asarray(r["descend_deg"], dtype=float)
+        target[6] = state[6]
+        self._move_to_state_pose(target, "recovery_descend")
+        # close: command the demo close depth; the block stalls the gripper
+        self._phase = "recovery_close"
+        deadline = self._clock() + float(r["close_wait_s"])
+        while self._clock() < deadline:
+            t0 = self._clock()
+            obs = self._obs()
+            state = self._state_vec(obs)
+            tgt = self._sam.to_action(state)
+            tgt[6] = self._sam.to_action(
+                np.concatenate([state[:6], [float(r["close_state"])]]))[6]
+            self._send(tgt)
+            rest = self._dt - (self._clock() - t0)
+            if rest > 0:
+                self._sleep(rest)
 
     def go_home(self):
         self._move_to_state_pose(self._cfg["poses_state_space"]["park"],

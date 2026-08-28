@@ -187,7 +187,9 @@ def main():
     io = LiveIO(robot, policy, cfg, verifier, recorder)
     harness = Harness(table, io, verify_burst=cfg["verify_burst"],
                       verify_majority=cfg["verify_majority"],
-                      deep_table=deep_table)
+                      deep_table=deep_table,
+                      recovery_from_attempt=cfg.get(
+                          "recovery", {}).get("from_attempt"))
 
     results = []
     for trial in range(1, args.trials + 1):

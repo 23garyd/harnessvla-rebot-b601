@@ -58,10 +58,16 @@ class TrialResult:
 
 class Harness:
     def __init__(self, table, io, max_attempts=3, verify_burst=5,
-                 verify_majority=3, deep_table=None):
+                 verify_majority=3, deep_table=None,
+                 recovery_from_attempt=None):
         if not 0 < verify_majority <= verify_burst:
             raise ValueError("verify_majority must be in (0, verify_burst]")
         self._table = table
+        # from this attempt number on, the HARNESS grasps (servo-centre,
+        # descend, close) instead of re-invoking the policy. The policy
+        # always gets attempt 1: the primitive is tried before the harness
+        # takes over. None = policy every attempt (pre-recovery behaviour).
+        self._recovery_from = recovery_from_attempt
         # retries stage from the AT-CLOSURE table when one is provided: after
         # a near-miss the policy gets the block practically in its fingers
         # (it is near-deterministic, so an identical retry repeats the miss)
@@ -106,8 +112,13 @@ class Harness:
                 return self._finish("refused", attempts,
                                     f"staging refused: {exc}")
 
+            recovery = (self._recovery_from is not None
+                        and i >= self._recovery_from)
             io.stage(pose)
-            io.invoke_policy()
+            if recovery:
+                io.recovery_grasp()
+            else:
+                io.invoke_policy()
             io.lift_to_verify()
             held = self._verify_held()
 
@@ -120,9 +131,11 @@ class Harness:
                         "held after place recovery"))
                     return self._finish("gave_up", attempts,
                                         "block stuck in gripper — needs a human")
-                reason = "grasped; placed by recovery"
+                reason = ("recovery grasped; placed" if recovery
+                          else "grasped; placed by recovery")
             else:
-                reason = "policy ran; gripper empty at verify"
+                reason = ("recovery ran; gripper empty at verify" if recovery
+                          else "policy ran; gripper empty at verify")
 
             attempts.append(AttemptRecord(i, tuple(pixel), float(dist),
                                           held, reason))
