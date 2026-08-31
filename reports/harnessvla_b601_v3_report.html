@@ -422,11 +422,32 @@ the earlier attempts displaced the block off the wrist camera's useful field —
 failed recovery makes the next one harder.</figcaption></figure>
 
 <h2>7&nbsp;&nbsp;Conclusions</h2>
-<p>Stated as the two questions the experiment was built to answer: <b>does the harness
-help?</b> No — 12/15 with and without it, every harness pass policy-completed, recovery
-0/16. <b>Does it work as expected?</b> Its verification, re-grounding and safety layers
-worked exactly as designed in every trial; its recovery actuation did not, and the
-primitive proved strong enough to leave the harness little room to matter. In detail:</p>
+<p><b>Did the harness help?</b> No — 12/15 with and without it, every harness pass
+policy-completed on attempt 1, recovery 0/16.</p>
+<p><b>Did it work as expected?</b> Split it by component, because the answer differs:</p>
+<ul>
+<li><b>The passive layers worked as designed.</b> The grasp verifier produced zero
+false holds across all runs, every real failure was detected and triggered a retry,
+the per-trial drift gate kept camera geometry pinned, the divergence guard never had
+to fire, and the fail-closed rule correctly refused every descend the servo couldn't
+earn. Nothing dangerous or dishonest ever happened.</li>
+<li><b>The active layer — recovery actuation — did not.</b> Closed-loop visual
+servoing at grasp depth converges from &le;60 px but not from the 130+ px errors that
+deep staging produces at held-out positions, and each failed attempt displaces the
+block, making the next attempt harder. That is a narrow, named engineering problem
+(§7.2 lists the measured fixes), not a refutation of the idea — but as tested, the
+harness never rescued a single trial.</li>
+</ul>
+<p><b>The deeper conclusion of v2</b> is arguably more valuable than the harness
+verdict: the same architecture that scored 0/10 held-out in v1 scored 7/10 held-out
+after the mount, corpus hygiene, coverage shape, and end-of-episode cue were fixed.
+The biggest lever on real-robot performance in this project was data and
+instrumentation discipline, not the planner layer — and once the primitive got good,
+verify-and-retry had almost nothing left to add on a task this short. So the thesis
+&ldquo;a harness makes an imperfect frozen primitive more reliable&rdquo; was given a
+fair test in its intended regime and did not clear it here; whether it would clear it
+with working recovery actuation, longer-horizon tasks, or a different primitive
+remains open — §7.2 frames exactly that as future work. In detail:</p>
 <ol>
 <li><b>The v2 rebuild vindicated the v1 post-mortem.</b> Same architecture, same model
 scale, same task: 0/10 held-out in v1 became 7/10 held-out (12/15 overall) after the
