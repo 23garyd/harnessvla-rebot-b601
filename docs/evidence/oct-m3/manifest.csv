@@ -1,0 +1,13 @@
+path,bytes,sha256,source
+README.md,4050,e20a626d2f4027d07b7c609a5e11fc17755df3b1b5e6a5eaaca32dff61be7efa,技术整理：2026-11-14
+hardware/20260822_213019/provenance.json,793,eb1604042740f39f97841b1164c394fc6e3adda9afa8705f077f9fd22f5f3e29,EPYC 2026-08-22 实机记录；视频转换见 provenance.json
+hardware/20260822_213019/results.json,2954,dbe22b198d3f530f69238941a6d883a40c2a866f21c11eb2c6f24e272efda09b,EPYC 2026-08-22 实机记录；视频转换见 provenance.json
+hardware/20260822_213019/trial_001.jsonl,363228,243337af54bc3198df36c7072fcd10e2c9c464e1db9316b026118a36ef651955,EPYC 2026-08-22 实机记录；视频转换见 provenance.json
+hardware/20260822_213019/trial_001_agentview.mp4,3688733,d62d3351f45865704103386703f1496d879c906a01ffc57ef5a536aeb4cc5118,EPYC 2026-08-22 实机记录；视频转换见 provenance.json
+implementation-commits.csv,1546,dca458fd44b5e6c834a8e75a214334490e6aa4fc5d4b5170eeddb5d7fffca707,技术整理：2026-11-14
+placement.md,1281,8a6fde02b6538b49eb731ed526ef257b42e18e80a8d1244db774f26e97c6363d,技术整理：2026-11-14
+provenance.json,302,59faa5cc5797bdc2f0f2ee110a34e8926d5f159c16d3f92dfc0fca2c7ba714ef,技术整理：2026-11-14
+snapshot-2026-08-25/b601_dataset_card_168_episodes.md,15172,02009d3ce0603487961735f6b971c7929cd82dac4a1c8ea84d07aabc60f856d5,既有 October 技术证据：2026-08-25 字节快照
+snapshot-2026-08-25/b601_progress_log.md,30467,dcdaa96846c0e84bf8e2cb1090dcdedef93f1d646b573db9715fa157f100cd7b,既有 October 技术证据：2026-08-25 字节快照
+snapshot-2026-08-25/b601_risk_log.md,25669,8b64c7fb6a995b3861fb4f927743fe581b8912f4b1bd0cde63caa4f3a5eccaa0,既有 October 技术证据：2026-08-25 字节快照
+verification/2026-11-14-tests.txt,689,7f2d5f926edd17109bc9c174fb3ad1d17fed96169c99e41f03ee9d6896af9b98,2026-11-14 指定测试子集的真实输出
