@@ -1,0 +1,14 @@
+{
+  "session": "20260822_213019",
+  "included_trial": 1,
+  "included_trial_outcome": "gave_up",
+  "attempts": 3,
+  "source_video": "outputs/harness_trials/20260822_213019/trial_001_agentview.mp4",
+  "source_video_sha256": "e4e29bf5ed7d9407fcbae5f3d87fc13b7e236b7bdf2f9a2b17a74fc391e37867",
+  "source_video_bytes": 155260459,
+  "source_video_duration_s": 69.734,
+  "included_video_sha256": "d62d3351f45865704103386703f1496d879c906a01ffc57ef5a536aeb4cc5118",
+  "transformation": "ffmpeg -i SOURCE -map 0:v:0 -vf scale=640:-2 -c:v libx264 -crf 30 -preset fast -an -movflags +faststart OUTPUT",
+  "temporal_edits": false,
+  "note": "完整源视频重编码；不作为任务成功或降级行为演示的证据；results.json 为完整五次试验结果，只有 trial 1 附视频和遥测。"
+}

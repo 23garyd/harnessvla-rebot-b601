@@ -1,5 +1,7 @@
 # harnessvla-rebot-b601
 
+当前实现的技术入口、附件与核验记录见 [技术证据索引](docs/evidence/oct-m3/README.md)。
+
 Memory-guided manipulation with the **reBot B601-RS**: a planner-staged frozen
 ACT grasp primitive wrapped in observe → stage → grasp → verify → transport →
 retry, with task-specific and global memory.
@@ -12,9 +14,7 @@ Read it before designing the verification or memory layers.
 
 ## Status
 
-**Day 0 — scaffold.** No hardware powered, no data collected, no experiment
-version frozen. Every limit in `b601/setup/limits.yaml` is provisional pending
-Day-2 measurement.
+已有 B601 实机试验、策略接入与控制保护实现。历史数据、实际运行附件、测试范围和未完成项见 [技术证据索引](docs/evidence/oct-m3/README.md)。原始数据与模型权重不包含在 Git 中。
 
 ## Layout
 
