@@ -1,0 +1,63 @@
+{
+  "evidence_kind": "既有结果整理，未新增实验",
+  "experiment_date": "2026-08-28",
+  "baseline": {
+    "success": 12,
+    "total": 15,
+    "source": "reports/harnessvla_b601_report.pdf，第10页；仅核对技术文档，未重新评分原始baseline数据",
+    "source_sha256": "4c2a8cf2491191658661b8a998b0d97c92dc30473ada60e6353f55e6c7f30868"
+  },
+  "harness": {
+    "success": 12,
+    "total": 15,
+    "source": "hardware/20260828_071714/results.json",
+    "all_successes_on_first_attempt": true
+  },
+  "interpretation": "总体持平，不能把I层+20个百分点解释为harness恢复成功",
+  "runs": [
+    {
+      "session": "20260828_071714",
+      "scope": "计分对照",
+      "trials": 15,
+      "raw_outcomes": {
+        "success": 12,
+        "gave_up": 3
+      },
+      "recovery_branch_entries": 6,
+      "recovery_entries_with_held_true": 0
+    },
+    {
+      "session": "20260828_074607",
+      "scope": "后续恢复排查，不能混入计分对照",
+      "trials": 3,
+      "raw_outcomes": {
+        "gave_up": 3
+      },
+      "recovery_branch_entries": 6,
+      "recovery_entries_with_held_true": 0
+    },
+    {
+      "session": "20260828_082005",
+      "scope": "后续恢复排查，不能混入计分对照",
+      "trials": 3,
+      "raw_outcomes": {
+        "gave_up": 2,
+        "success": 1
+      },
+      "recovery_branch_entries": 4,
+      "recovery_entries_with_held_true": 0
+    }
+  ],
+  "adjudication_flag": {
+    "session": "20260828_082005",
+    "trial": 3,
+    "raw_result": "success",
+    "operator_result_in_technical_record": "fail",
+    "resolution": "未裁决，保留双方记录；不混入071714计分对照"
+  },
+  "limits": [
+    "无线链路比较未包含",
+    "全部raw视频和模型权重未纳入此技术附件",
+    "历史试验的确切源码/依赖状态不能仅由当前HEAD推定"
+  ]
+}
