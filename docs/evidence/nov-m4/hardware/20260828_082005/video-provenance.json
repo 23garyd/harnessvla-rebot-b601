@@ -1,0 +1,14 @@
+{
+  "session": "20260828_082005",
+  "trial": 1,
+  "outcome": "gave_up",
+  "source_video_path": "outputs/harness_trials/20260828_082005/trial_001_agentview.mp4",
+  "source_video_sha256": "82a614975d012b6184e593b66ea2aac96aaaf68f9ae8bbeb93a301f01037fb6e",
+  "source_video_bytes": 74427307,
+  "source_duration_s": 38.867,
+  "included_duration_s": 38.867,
+  "included_sha256": "663094abd94589b5ebf0c876005dcfc6051b231207da1d850acbd0f04e3c2597",
+  "temporal_edits": false,
+  "transformation": "ffmpeg -i SOURCE -map 0:v:0 -vf scale=640:-2 -c:v libx264 -crf 30 -preset fast -an -movflags +faststart OUTPUT",
+  "boundary": "完整时序重编码；恢复排查失败示例，不作为恢复成功、物理安全中止或无线降级演示"
+}

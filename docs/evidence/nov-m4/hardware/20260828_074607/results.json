@@ -1,0 +1,116 @@
+[
+ {
+  "trial": 1,
+  "outcome": "gave_up",
+  "detail": "3 attempts exhausted",
+  "seconds": 71.1,
+  "attempts": [
+   {
+    "index": 1,
+    "pixel": [
+     241.07177814029365,
+     421.61718325176724
+    ],
+    "staging_distance_px": 36.77241326849481,
+    "held": false,
+    "reason": "policy ran; gripper empty at verify"
+   },
+   {
+    "index": 2,
+    "pixel": [
+     256.39231664726424,
+     423.67112922002326
+    ],
+    "staging_distance_px": 41.79941399457022,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   },
+   {
+    "index": 3,
+    "pixel": [
+     271.8376696832579,
+     433.2680995475113
+    ],
+    "staging_distance_px": 43.601901840875215,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   }
+  ]
+ },
+ {
+  "trial": 2,
+  "outcome": "gave_up",
+  "detail": "3 attempts exhausted",
+  "seconds": 70.2,
+  "attempts": [
+   {
+    "index": 1,
+    "pixel": [
+     241.52087576374745,
+     424.70264765784117
+    ],
+    "staging_distance_px": 37.11134349718705,
+    "held": false,
+    "reason": "policy ran; gripper empty at verify"
+   },
+   {
+    "index": 2,
+    "pixel": [
+     248.67931587386425,
+     432.2699091394976
+    ],
+    "staging_distance_px": 44.95081232118374,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   },
+   {
+    "index": 3,
+    "pixel": [
+     262.78563411896744,
+     448.81874298540964
+    ],
+    "staging_distance_px": 61.09099522871208,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   }
+  ]
+ },
+ {
+  "trial": 3,
+  "outcome": "gave_up",
+  "detail": "3 attempts exhausted",
+  "seconds": 71.2,
+  "attempts": [
+   {
+    "index": 1,
+    "pixel": [
+     243.02268041237113,
+     422.21649484536084
+    ],
+    "staging_distance_px": 38.678175203829724,
+    "held": false,
+    "reason": "policy ran; gripper empty at verify"
+   },
+   {
+    "index": 2,
+    "pixel": [
+     252.6891327063741,
+     433.1201671891327
+    ],
+    "staging_distance_px": 49.04754047315789,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   },
+   {
+    "index": 3,
+    "pixel": [
+     267.4616704805492,
+     449.0863844393593
+    ],
+    "staging_distance_px": 60.01074548158132,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   }
+  ]
+ }
+]

@@ -1,0 +1,96 @@
+[
+ {
+  "trial": 1,
+  "outcome": "gave_up",
+  "detail": "3 attempts exhausted",
+  "seconds": 70.2,
+  "attempts": [
+   {
+    "index": 1,
+    "pixel": [
+     235.00769625448947,
+     425.1770138532581
+    ],
+    "staging_distance_px": 30.60558845771565,
+    "held": false,
+    "reason": "policy ran; gripper empty at verify"
+   },
+   {
+    "index": 2,
+    "pixel": [
+     255.58254716981133,
+     449.4793632075472
+    ],
+    "staging_distance_px": 56.95639499926734,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   },
+   {
+    "index": 3,
+    "pixel": [
+     257.7171787709497,
+     462.429469273743
+    ],
+    "staging_distance_px": 65.4407179603161,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   }
+  ]
+ },
+ {
+  "trial": 2,
+  "outcome": "gave_up",
+  "detail": "3 attempts exhausted",
+  "seconds": 71.9,
+  "attempts": [
+   {
+    "index": 1,
+    "pixel": [
+     246.69746909947028,
+     429.78045909358445
+    ],
+    "staging_distance_px": 42.619252691578424,
+    "held": false,
+    "reason": "policy ran; gripper empty at verify"
+   },
+   {
+    "index": 2,
+    "pixel": [
+     258.70344424985404,
+     437.928779918272
+    ],
+    "staging_distance_px": 52.61053016845447,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   },
+   {
+    "index": 3,
+    "pixel": [
+     267.8003826530612,
+     457.5044642857143
+    ],
+    "staging_distance_px": 68.12152574038589,
+    "held": false,
+    "reason": "recovery ran; gripper empty at verify"
+   }
+  ]
+ },
+ {
+  "trial": 3,
+  "outcome": "success",
+  "detail": "block in saucer after attempt 1",
+  "seconds": 52.4,
+  "attempts": [
+   {
+    "index": 1,
+    "pixel": [
+     453.11630079402147,
+     333.03035964502567
+    ],
+    "staging_distance_px": 38.639953791049464,
+    "held": false,
+    "reason": "policy ran; gripper empty at verify"
+   }
+  ]
+ }
+]

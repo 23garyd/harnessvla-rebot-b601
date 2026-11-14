@@ -1,0 +1,32 @@
+[
+  {
+    "path": "20260828_071714/results.json",
+    "source": "/home/demo/Public/harnessvla-rebot-b601/outputs/harness_trials/20260828_071714/results.json",
+    "sha256": "cef40f8308d76a8bad2b4a1f1bd99c25d3e1f442017604c3ac00c14bb4752b0a"
+  },
+  {
+    "path": "20260828_074607/results.json",
+    "source": "/home/demo/Public/harnessvla-rebot-b601/outputs/harness_trials/20260828_074607/results.json",
+    "sha256": "05bf99a07cbdf81f34c6f569b3f340eb956e6ceecd4273f0e8368abb4d5821f3"
+  },
+  {
+    "path": "20260828_082005/results.json",
+    "source": "/home/demo/Public/harnessvla-rebot-b601/outputs/harness_trials/20260828_082005/results.json",
+    "sha256": "cf0adcf010179726af35fee250dc698b28308785d54ccddc370dd52635cf7615"
+  },
+  {
+    "path": "20260828_071714/trial_001.jsonl",
+    "source": "/home/demo/Public/harnessvla-rebot-b601/outputs/harness_trials/20260828_071714/trial_001.jsonl",
+    "sha256": "952a8361c2b6beb93ef9f7e4d030ef7e5384a3470f71b1f5bf7f52823ac1b519"
+  },
+  {
+    "path": "20260828_082005/trial_001.jsonl",
+    "source": "/home/demo/Public/harnessvla-rebot-b601/outputs/harness_trials/20260828_082005/trial_001.jsonl",
+    "sha256": "544f8a448ad3b11b76588460a8a44f618587500d0e9b9a7cd0bcb7ad35d834ca"
+  },
+  {
+    "path": "20260828_082005/trial_003.jsonl",
+    "source": "/home/demo/Public/harnessvla-rebot-b601/outputs/harness_trials/20260828_082005/trial_003.jsonl",
+    "sha256": "c50364e6f8905ab205b4b426bb8bb7f57ee9f355ad484d3369b6fc132aafefa3"
+  }
+]
