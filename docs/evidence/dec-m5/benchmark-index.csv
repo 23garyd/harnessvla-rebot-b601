@@ -1,5 +1,5 @@
 track,recorded_result,source_path,boundary
-B601 v2 baseline,12/15,../../../reports/harnessvla_b601_report.pdf,文档核对；未重新评分baseline原始数据
-B601 v2 harness,12/15,../nov-m4/hardware/20260828_071714/results.json,原始15次计分结果；成功全部为第一次策略尝试
-恢复分支,0/16 持物成功,../nov-m4/comparison-summary.json,6+6+4次分支进入；未保证每次均执行完整抓取动作
-无线比较,待补,../nov-m4/README.md,没有可核验的无线对比结果
+B601 v2 baseline,12/15,../../../reports/harnessvla_b601_report.pdf,Documentation cross-check only; original baseline data was not rescored
+B601 v2 harness,12/15,../nov-m4/hardware/20260828_071714/results.json,Original results from 15 scored trials; all successes occurred on the first policy attempt
+Recovery branch,0/16 successful holds,../nov-m4/comparison-summary.json,6+6+4 branch entries; not every entry necessarily executed a complete grasp action
+Wireless comparison,Pending,../nov-m4/README.md,No verifiable wireless comparison results are available

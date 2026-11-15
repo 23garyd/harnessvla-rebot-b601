@@ -1,15 +1,15 @@
 path,bytes,sha256,source
-README.md,3504,616aef01c1a3686ddf0292d879df22aaaa5b8a24d67c4d6b505c35f7a6ca9496,2026-11-14 技术整理，未新增实机或模型实验
-comparison-summary.json,1872,69bb87fc78219cfe0aef7717d8f53b5da1e75cd960a927017772543c79b8cf70,2026-11-14 技术整理，未新增实机或模型实验
-hardware/20260828_071714/results.json,6435,cef40f8308d76a8bad2b4a1f1bd99c25d3e1f442017604c3ac00c14bb4752b0a,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_071714/trial_001.jsonl,171188,952a8361c2b6beb93ef9f7e4d030ef7e5384a3470f71b1f5bf7f52823ac1b519,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_074607/results.json,2301,05bf99a07cbdf81f34c6f569b3f340eb956e6ceecd4273f0e8368abb4d5821f3,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_082005/results.json,1875,cf0adcf010179726af35fee250dc698b28308785d54ccddc370dd52635cf7615,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_082005/trial_001.jsonl,216171,544f8a448ad3b11b76588460a8a44f618587500d0e9b9a7cd0bcb7ad35d834ca,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_082005/trial_001_agentview.mp4,1635062,663094abd94589b5ebf0c876005dcfc6051b231207da1d850acbd0f04e3c2597,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_082005/trial_003.jsonl,164195,c50364e6f8905ab205b4b426bb8bb7f57ee9f355ad484d3369b6fc132aafefa3,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/20260828_082005/video-provenance.json,735,54d4fbe53486f7685d0fd2e7c9e5b3e2386298c8ad8f7d5f86bd8e6160e8171b,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-hardware/source-receipts.json,1479,a96c62bd42144cb5f8d5ba622664e70987faf9d6b377fad16b97f9fd4ca1115c,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
-implementation-commits.csv,1131,78b6d1e54db63238239893e4b37e6318fca7af12680219f70a86913fcd26caea,2026-11-14 技术整理，未新增实机或模型实验
-provenance.json,237,9a33fbb6c67da45a817517d63818d956dc1d9644ca63fe2db2ae59ba15c87d09,2026-11-14 技术整理，未新增实机或模型实验
-verification/2026-11-14-tests.txt,793,55c8dbdfd140e103d05057e2af585b82f10e4aa844b6f8f25ef65188827689cf,2026-11-14 指定无硬件测试真实输出，跳过项另列
+README.md,3504,616aef01c1a3686ddf0292d879df22aaaa5b8a24d67c4d6b505c35f7a6ca9496,2026-11-14 technical compilation; no new physical robot or model experiments
+comparison-summary.json,2120,b3d215ee1ecf51a4a95f5194258ee39ede58c9b6a6bb9123999f900fb39df04e,2026-11-14 technical compilation; no new physical robot or model experiments
+hardware/20260828_071714/results.json,6435,cef40f8308d76a8bad2b4a1f1bd99c25d3e1f442017604c3ac00c14bb4752b0a,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_071714/trial_001.jsonl,171188,952a8361c2b6beb93ef9f7e4d030ef7e5384a3470f71b1f5bf7f52823ac1b519,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_074607/results.json,2301,05bf99a07cbdf81f34c6f569b3f340eb956e6ceecd4273f0e8368abb4d5821f3,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_082005/results.json,1875,cf0adcf010179726af35fee250dc698b28308785d54ccddc370dd52635cf7615,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_082005/trial_001.jsonl,216171,544f8a448ad3b11b76588460a8a44f618587500d0e9b9a7cd0bcb7ad35d834ca,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_082005/trial_001_agentview.mp4,1635062,663094abd94589b5ebf0c876005dcfc6051b231207da1d850acbd0f04e3c2597,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_082005/trial_003.jsonl,164195,c50364e6f8905ab205b4b426bb8bb7f57ee9f355ad484d3369b6fc132aafefa3,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/20260828_082005/video-provenance.json,779,6d5b63dd03ebb4f84f7422cd81a183200c598711870ffafb2c5287fa2e27531a,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+hardware/source-receipts.json,1479,a96c62bd42144cb5f8d5ba622664e70987faf9d6b377fad16b97f9fd4ca1115c,EPYC 2026-08-28 existing records; see receipts and video provenance files for specific sources
+implementation-commits.csv,1147,46618655c303424eff134c76de6c072814a6ca61e254e6a1324865e78f031e84,2026-11-14 technical compilation; no new physical robot or model experiments
+provenance.json,259,a952ea53175f9a7f97a5b3ea134b81751a0a17dd772401283c122197bcc8c55b,2026-11-14 technical compilation; no new physical robot or model experiments
+verification/2026-11-14-tests.txt,868,68d7f7ace1973989476062116a4057d67c463c92005526ea68e2ea7c2872bb12,2026-11-14 actual output from specified hardware-free tests; skipped items listed separately

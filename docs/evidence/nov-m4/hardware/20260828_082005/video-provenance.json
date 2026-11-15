@@ -10,5 +10,5 @@
   "included_sha256": "663094abd94589b5ebf0c876005dcfc6051b231207da1d850acbd0f04e3c2597",
   "temporal_edits": false,
   "transformation": "ffmpeg -i SOURCE -map 0:v:0 -vf scale=640:-2 -c:v libx264 -crf 30 -preset fast -an -movflags +faststart OUTPUT",
-  "boundary": "完整时序重编码；恢复排查失败示例，不作为恢复成功、物理安全中止或无线降级演示"
+  "boundary": "Full-timeline re-encoding; failed recovery investigation example; not a demonstration of successful recovery, a physical safety abort, or wireless degradation"
 }
