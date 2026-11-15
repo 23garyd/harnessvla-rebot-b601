@@ -1,9 +1,9 @@
-核验日期：2026-11-14
-实现提交：689526cdf4ec9126fec67f1a3017cb443893752f
-范围：所列测试子集；无物理机器人动作，无新模型推理或训练。
-执行环境：EPYC，现有 .venv/bin/python
-命令：.venv/bin/python -m pytest b601/tests/test_harness.py b601/tests/test_harness_io.py b601/tests/test_grasp_verifier.py b601/tests/test_live_servo.py b601/tests/test_safety.py -q -p no:anyio
-退出码：0
+Verification date: 2026-11-14
+Implementation commit: 689526cdf4ec9126fec67f1a3017cb443893752f
+Scope: listed test subset; no physical robot motion and no new model inference or training.
+Execution environment: EPYC; existing .venv/bin/python
+Command: .venv/bin/python -m pytest b601/tests/test_harness.py b601/tests/test_harness_io.py b601/tests/test_grasp_verifier.py b601/tests/test_live_servo.py b601/tests/test_safety.py -q -p no:anyio
+Exit code: 0
 
 ........................................................................ [ 38%]
 ........................................................................ [ 77%]

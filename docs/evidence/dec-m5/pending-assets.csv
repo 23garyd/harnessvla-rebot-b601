@@ -1,4 +1,4 @@
 asset,status,source_reference,retrieval_url,sha256
-ACT v2 数据集及权重,未提供完整外部取回归档,见原仓库技术记录，不能把本机路径视为下载链接,,
-全部物理试验录像,未提供完整外部取回归档,见原仓库技术记录，不能把本机路径视为下载链接,,
-厂商运行环境与标定依赖,未提供完整外部取回归档,见原仓库技术记录，不能把本机路径视为下载链接,,
+ACT v2 dataset and weights,Complete externally retrievable archive not provided,See technical records in the original repository; local paths are not download links,,
+All physical trial videos,Complete externally retrievable archive not provided,See technical records in the original repository; local paths are not download links,,
+Vendor runtime and calibration dependencies,Complete externally retrievable archive not provided,See technical records in the original repository; local paths are not download links,,

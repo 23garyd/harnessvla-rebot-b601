@@ -10,5 +10,5 @@
   "included_video_sha256": "d62d3351f45865704103386703f1496d879c906a01ffc57ef5a536aeb4cc5118",
   "transformation": "ffmpeg -i SOURCE -map 0:v:0 -vf scale=640:-2 -c:v libx264 -crf 30 -preset fast -an -movflags +faststart OUTPUT",
   "temporal_edits": false,
-  "note": "完整源视频重编码；不作为任务成功或降级行为演示的证据；results.json 为完整五次试验结果，只有 trial 1 附视频和遥测。"
+  "note": "Full source video re-encoding; not evidence of task success or a degradation behavior demonstration; results.json contains all five trial results; only trial 1 includes video and telemetry."
 }

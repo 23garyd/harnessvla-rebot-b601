@@ -49,6 +49,8 @@ Improved success from recovery, a complete physical degraded-mode demonstration,
 
 ## Code Navigation and Verification
 
+For the complete guide and evidence map, see the [documentation index](docs/README.md).
+
 | Path | Contents |
 |---|---|
 | `b601/planner/` | Outer-loop control, physical I/O, perception and logging |
