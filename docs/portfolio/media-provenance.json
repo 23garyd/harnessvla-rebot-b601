@@ -1,0 +1,32 @@
+{
+  "prepared_at": "2026-11-14",
+  "new_experiment": false,
+  "repository": "harnessvla-rebot-b601",
+  "media": [
+    {
+      "kind": "video",
+      "path": "docs/evidence/nov-m4/hardware/20260828_082005/trial_001_agentview.mp4",
+      "sha256": "663094abd94589b5ebf0c876005dcfc6051b231207da1d850acbd0f04e3c2597",
+      "caption": "B601 实机失败排查：2026-08-28第二轮排查trial 1，结果 gave_up。完整时序38.867秒，仅缩小重编码；不是恢复成功、安全中止或无线降级演示。"
+    },
+    {
+      "kind": "poster",
+      "path": "docs/portfolio/assets/demo-poster.png",
+      "derived_from": "docs/evidence/nov-m4/hardware/20260828_082005/trial_001_agentview.mp4",
+      "extraction": "ffmpeg -ss 1.0 -i SOURCE -frames:v 1 OUTPUT；无生成画面或合成动作",
+      "sha256": "881acf7f6354453912a6db8d92968d5182c9668fac4d249c43ced101907819d5"
+    },
+    {
+      "kind": "existing_photo",
+      "path": "reports/assets_v2/v2_eval_targets.jpg",
+      "sha256": "77807efa7a0fc03e9786aaf66e59e794c151f421cd0bde29bdce3453bf3d7337",
+      "caption": "真实B601实验台和评估点位，非全成功证明"
+    },
+    {
+      "kind": "explanatory_diagram",
+      "path": "docs/portfolio/assets/architecture.svg",
+      "sha256": "b1aeff2a17a1fafe276baddfccaad3f9dd6c55b648e8beb692fdecfb58de77e0",
+      "caption": "依当前代码边界绘制的软件结构示意，非实验画面或新增执行证据"
+    }
+  ]
+}
