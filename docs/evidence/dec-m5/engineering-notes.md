@@ -1,11 +1,11 @@
-# 实机控制的技术建议与后续工程项
+# Technical recommendations and follow-up engineering for physical robot control
 
-已有依据：[对照与恢复摘要](../nov-m4/comparison-summary.json)、[代码实际保护路径](../../../b601/planner/io_support.py)、[实验注册表](../../../b601/registry/experiment_registry.md)。
+Existing evidence: [comparison and recovery summary](../nov-m4/comparison-summary.json), [implemented protection path](../../../b601/planner/io_support.py), and [experiment registry](../../../b601/registry/experiment_registry.md).
 
-- 保留执行端的逐步速度／差异保护与逐试验几何门禁；普通成功视频不能替代故障拒绝演示。分别检查 SafeDriver 与 lerobot 实际策略路径。
-- 数据分布、相机稳定及操作协议是性能归因的一部分。B601 v2 的总体对照持平，不把分层波动归为恢复机制收益。
-- 在线控制与时延敏感的安全状态应有本地约束；本地执行、远程训练只是现有分工，不是三类推理部署比较结果。
-- 先关闭恢复分支的感知／动作收敛问题与争议评分，再决定是否继续扩展实验；新参数应有匹配数据、软件版本和结果，不从后续 HEAD 反推历史状态。
-- 无线技术选择仍需对同一数据流执行 Wi-Fi／Bluetooth／NearLink 实测，当前不提供未经测量的优劣排名、能耗或恢复时延数字。
+- Retain per-step execution speed/delta safeguards and per-trial geometry gates; ordinary success videos cannot replace fault-rejection demonstrations. Check SafeDriver and the actual lerobot policy path separately.
+- Data distribution, camera stability, and operating protocols are part of performance attribution. The overall B601 v2 comparison is tied; do not attribute differences between strata to recovery benefits.
+- Online control and latency-sensitive safety states should have local constraints; local execution and remote training describe the existing division of work, rather than comparison results for three inference deployment modes.
+- Resolve the recovery branch perception/action convergence issues and disputed scoring before deciding whether to expand experiments; new parameters should have matching data, software versions, and results. Do not infer historical states from a later HEAD.
+- Wireless technology selection still requires Wi-Fi/Bluetooth/NearLink measurements using the same data stream. No unmeasured rankings, energy consumption figures, or recovery latency figures are provided.
 
-后续工程：补充物理安全拒绝及恢复演示；为实际机器人/edge/hybrid 推理配置设计同任务比较；提供数据/模型可取回归档；固定整套厂商依赖后做干净机器重建。上述为后续项，不是已完成工作或新的验收承诺。
+Follow-up engineering: add physical safety rejection and recovery demonstrations; design same-task comparisons for actual robot/edge/hybrid inference configurations; provide retrievable data/model archives; pin all vendor dependencies and then rebuild on a clean machine. These are follow-up items, not completed work or new acceptance commitments.

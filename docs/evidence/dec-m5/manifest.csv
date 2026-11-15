@@ -1,9 +1,9 @@
 path,bytes,sha256,source
-README.md,1791,f0320ff84c0e029bf98800097697acf0913dfa9181d85bc56a7342c3857e0675,2026-11-14 技术整理，未新增实机或模型实验
-archive-manifest.csv,49616,722908af14bd3fb4b83737c11435c02c3557771e84f661bc7a9d3b1277530228,源提交 e48995c4ca156bacf45cf60b70194d6bffd47957 中全部已跟踪文件的逐字节归档索引
-benchmark-index.csv,502,e4e225eeb075638b98f1dbf1ed9ba9d99532e6db798ff6b42d858104f6b38f15,2026-11-14 技术整理，未新增实机或模型实验
-engineering-notes.md,1394,f33843a563a39f350d98e6ebf62dcc92dbfd0f63da88041d536805a0bc33653b,2026-11-14 技术整理，未新增实机或模型实验
-implementation-commits.csv,1087,71580dad797469d1998f822b38ffe1152c5636787644a80166b9779273f2d2fd,2026-11-14 技术整理，未新增实机或模型实验
-pending-assets.csv,445,8cfe332ace2542f09a6b5c8c349c7fce6102d1255a325f7e91c05456118a5157,2026-11-14 技术整理，未新增实机或模型实验
-provenance.json,271,b4d347c987a429e4706e028d08528f8d1612f6a3bba6eef87540e8c764caaa8f,2026-11-14 技术整理，未新增实机或模型实验
-reproduce.md,1858,609802483a8aafafb8c21f162c2e338830c8d65f712bda604f7124282304ce12,2026-11-14 技术整理，未新增实机或模型实验
+README.md,1791,f0320ff84c0e029bf98800097697acf0913dfa9181d85bc56a7342c3857e0675,2026-11-14 technical compilation; no new physical robot or model experiments
+archive-manifest.csv,49759,47719ccd6406918dfa4789824c4d27f74aa96a787e6c58a673b549a5aaa54020,Byte-level archive index of all tracked files in source commit e48995c4ca156bacf45cf60b70194d6bffd47957
+benchmark-index.csv,602,6eb3165c4a836c1390d46d72f253c3ed5c1455d28a805035af25fb001e083e15,2026-11-14 technical compilation; no new physical robot or model experiments
+engineering-notes.md,1781,61b67628b038d7a47404c86b50ae13cf898269bc9199edef2b4fe3e89e8dccfa,2026-11-14 technical compilation; no new physical robot or model experiments
+implementation-commits.csv,1106,d4bce925f66e1ee6e6c9c940b7e831bbeaff21e0aa0296afa2d23382c49bfa2c,2026-11-14 technical compilation; no new physical robot or model experiments
+pending-assets.csv,568,2a14836483f9a59d7fef3234a3e0340350f79567db8db604dc6b958a962c68f7,2026-11-14 technical compilation; no new physical robot or model experiments
+provenance.json,271,b4d347c987a429e4706e028d08528f8d1612f6a3bba6eef87540e8c764caaa8f,2026-11-14 technical compilation; no new physical robot or model experiments
+reproduce.md,2297,47673b8c71bc3b2d6576ed1c833bfcda2fde2f9ae3e6b08c9ed2cae418b0a722,2026-11-14 technical compilation; no new physical robot or model experiments

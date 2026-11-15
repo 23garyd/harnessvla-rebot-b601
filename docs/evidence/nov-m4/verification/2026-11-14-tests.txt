@@ -1,9 +1,9 @@
-核验日期：2026-11-14
-范围：November/December 技术证据整理所用无硬件测试子集，未新增实机试验、GPU rollout、训练或模型调用。
-环境：EPYC，现有机器人 .venv；指定测试子集
-命令：python -m pytest b601/tests/test_ledger_and_compare.py b601/tests/test_live_servo.py b601/tests/test_trial_gate.py b601/tests/test_run_record.py b601/tests/test_origin_pin.py b601/tests/test_model_pins.py b601/tests/test_setup_pins.py -q -p no:anyio
-退出码：0
-跳过项不计为通过；这些输出不证明干净机器重建或实体机器人安全演示完成。
+Verification date: 2026-11-14
+Scope: hardware-free test subset used for the November/December technical evidence compilation; no new physical robot trials, GPU rollout, training, or model calls.
+Environment: EPYC; existing robot .venv; specified test subset
+Command: python -m pytest b601/tests/test_ledger_and_compare.py b601/tests/test_live_servo.py b601/tests/test_trial_gate.py b601/tests/test_run_record.py b601/tests/test_origin_pin.py b601/tests/test_model_pins.py b601/tests/test_setup_pins.py -q -p no:anyio
+Exit code: 0
+Skipped items do not count as passed; this output does not establish completion of a clean-machine rebuild or physical robot safety demonstration.
 
 ........................................................................ [ 80%]
 ...s..............                                                       [100%]

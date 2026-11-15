@@ -1,13 +1,13 @@
-# 推理与计算任务部署技术说明
+# Technical notes on inference and compute task deployment
 
-记录日期：2026-11-14；依据截至 2026-08-25 的已有技术材料与当前执行入口整理。这里没有新增部署实验。
+Record date: 2026-11-14; compiled from existing technical materials through 2026-08-25 and the current execution entry points. No new deployment experiments were conducted here.
 
-| 部署方式 | 已有材料支持的事实 | 验证边界 |
+| Deployment mode | Facts supported by existing materials | Verification boundary |
 |---|---|---|
-| robot-local | EPYC 上的策略执行、机械臂控制及相机采集；[2026-08-22 实机遥测](hardware/20260822_213019/trial_001.jsonl) 与视频可检查实际执行 | 单机执行记录，不能推导其他网络条件下的时延 |
-| edge | ASUS／A6000 用于仿真和批处理；历史技术材料说明训练与计算分工 | 远程训练、批处理不等于 edge 在线推理已评估；此目录没有该运行结果 |
-| hybrid | 本地执行、远程训练的工作分工 | 不能直接称为本地与远程联合在线推理验证；尚无相同任务下的三类配置和比较记录 |
+| robot-local | Policy execution, arm control, and camera capture on EPYC; [2026-08-22 physical robot telemetry](hardware/20260822_213019/trial_001.jsonl) and video allow inspection of actual execution | Single-machine execution records do not establish latency under other network conditions |
+| edge | ASUS/A6000 used for simulation and batch processing; historical technical materials describe the division of training and compute work | Remote training and batch processing do not establish an evaluation of online edge inference; this directory contains no such run results |
+| hybrid | Division of work between local execution and remote training | This does not establish verification of combined local and remote online inference; configurations and comparison records for all three modes on the same task are not yet available |
 
-复核入口：[执行程序](../../../b601/planner/run_harness.py)、[实际 I/O](../../../b601/planner/live_io.py)、[实验记录快照](snapshot-2026-08-25/b601_progress_log.md)。
+Review entry points: [execution program](../../../b601/planner/run_harness.py), [actual I/O](../../../b601/planner/live_io.py), and [experiment record snapshot](snapshot-2026-08-25/b601_progress_log.md).
 
-要补齐推理部署评估，需要记录各模式下实际运行的组件、模型和软件版本、任务、机器配置、原始日志与结果。当前材料只能证明已有执行与分工，不能代替这些评估结果。
+Completing the inference deployment evaluation requires recording the components actually running in each mode, model and software versions, tasks, machine configurations, raw logs, and results. Current materials establish only the existing execution and division of work; they cannot replace those evaluation results.
