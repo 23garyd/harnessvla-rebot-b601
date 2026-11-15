@@ -1,0 +1,7 @@
+{
+  "implementation_commit": "689526cdf4ec9126fec67f1a3017cb443893752f",
+  "prepared_on": "2026-11-14",
+  "verification_scope": "仅记录指定的无硬件测试子集；未新增实机、仿真、训练或模型调用",
+  "source_snapshot_date": "2026-08-25",
+  "acceptance_report_included": false
+}
