@@ -1,14 +1,14 @@
-# 展示页整理前的技术说明
+# Technical Guide Before the Showcase Update
 
-这是历史README快照，状态和运行命令按当时记录理解。当前概览见[仓库首页](../../README.md)。
+This historical README records the status and commands of its original environment. See the [current project overview](../../README.md). The editorial header is translated; the historical run instructions below are retained.
 
 # harnessvla-rebot-b601
 
-补充技术证据：[基准、复现与归档资料](../../docs/evidence/dec-m5/README.md)。
+Additional technical evidence: [benchmarks, reproduction and archives](../../docs/evidence/dec-m5/README.md).
 
-补充技术证据：[比较与演示材料索引](../../docs/evidence/nov-m4/README.md)。
+Additional technical evidence: [comparisons and demonstrations](../../docs/evidence/nov-m4/README.md).
 
-当前实现的技术入口、附件与核验记录见 [技术证据索引](../../docs/evidence/oct-m3/README.md)。
+See the [technical evidence index](../../docs/evidence/oct-m3/README.md) for current implementation entry points, artifacts and verification records.
 
 Memory-guided manipulation with the **reBot B601-RS**: a planner-staged frozen
 ACT grasp primitive wrapped in observe → stage → grasp → verify → transport →
@@ -22,7 +22,7 @@ Read it before designing the verification or memory layers.
 
 ## Status
 
-已有 B601 实机试验、策略接入与控制保护实现。历史数据、实际运行附件、测试范围和未完成项见 [技术证据索引](../../docs/evidence/oct-m3/README.md)。原始数据与模型权重不包含在 Git 中。
+B601 hardware trial records, policy integration and execution safeguards are available. See the [technical evidence index](../../docs/evidence/oct-m3/README.md) for historical data, execution artifacts, test scope and outstanding work. Raw datasets and model weights are not included in Git.
 
 ## Layout
 

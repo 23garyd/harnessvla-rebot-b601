@@ -1,5 +1,5 @@
 path,bytes,sha256,source
-README.md,2998,bedf5ac9b8acc70d047f6c3930c927f2845ce2b3087f32b678e25a7c7a41a43b,2026-11-14 技术整理，未新增实机或模型实验
+README.md,3504,616aef01c1a3686ddf0292d879df22aaaa5b8a24d67c4d6b505c35f7a6ca9496,2026-11-14 技术整理，未新增实机或模型实验
 comparison-summary.json,1872,69bb87fc78219cfe0aef7717d8f53b5da1e75cd960a927017772543c79b8cf70,2026-11-14 技术整理，未新增实机或模型实验
 hardware/20260828_071714/results.json,6435,cef40f8308d76a8bad2b4a1f1bd99c25d3e1f442017604c3ac00c14bb4752b0a,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
 hardware/20260828_071714/trial_001.jsonl,171188,952a8361c2b6beb93ef9f7e4d030ef7e5384a3470f71b1f5bf7f52823ac1b519,EPYC 2026-08-28 既有记录；具体来源见回执和视频来源文件
